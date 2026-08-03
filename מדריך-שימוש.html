@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Agrix CRM — מדריך שימוש</title>
+<style>
+  :root {
+    color-scheme: light;
+    --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink2: #52514e;
+    --muted: #898781; --border: rgba(11,11,11,0.1); --brand: #1c5cab;
+    --accent: #eda100; --good: #006300; --warn-bg: #fff7e6;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      color-scheme: dark;
+      --page: #0d0d0d; --surface: #1a1a19; --ink: #fff; --ink2: #c3c2b7;
+      --border: rgba(255,255,255,0.12); --brand: #3987e5; --good: #0ca30c; --warn-bg: #2a230f;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--page); color: var(--ink);
+    font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+    font-size: 16px; line-height: 1.65;
+  }
+  .wrap { max-width: 860px; margin: 0 auto; padding: 24px 18px 60px; }
+  header.hero {
+    background: var(--brand); color: #fff; border-radius: 16px;
+    padding: 26px 24px; margin-bottom: 22px;
+  }
+  header.hero h1 { margin: 0 0 6px; font-size: 1.6rem; }
+  header.hero p { margin: 0; opacity: 0.9; }
+  header.hero a { color: #ffe9b3; font-weight: 600; }
+  .card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 20px; margin-bottom: 16px;
+  }
+  h2 { font-size: 1.25rem; margin: 0 0 10px; color: var(--brand); }
+  h3 { font-size: 1.02rem; margin: 16px 0 6px; }
+  p { margin: 8px 0; }
+  .chip {
+    display: inline-block; background: var(--page); border: 1px solid var(--border);
+    border-radius: 99px; padding: 1px 12px; font-size: 0.85rem; font-weight: 600;
+  }
+  .flow { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 10px 0; }
+  .flow .arrow { color: var(--muted); }
+  .tip {
+    background: var(--warn-bg); border-radius: 10px; padding: 10px 14px;
+    margin: 10px 0; font-size: 0.93rem;
+  }
+  .tip b:first-child { color: var(--accent); }
+  table { width: 100%; border-collapse: collapse; font-size: 0.93rem; margin: 8px 0; }
+  th { text-align: right; color: var(--muted); font-weight: 600; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  td { padding: 7px 8px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  tr:last-child td { border-bottom: none; }
+  .num { font-variant-numeric: tabular-nums; }
+  .muted { color: var(--muted); }
+  .kbd { background: var(--page); border: 1px solid var(--border); border-radius: 6px; padding: 0 6px; font-size: 0.88em; }
+  ol.steps { padding-inline-start: 20px; margin: 8px 0; }
+  ol.steps li { margin: 6px 0; }
+  .screens td:first-child { white-space: nowrap; font-weight: 600; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="hero">
+  <h1>🌰 Agrix CRM — מדריך שימוש</h1>
+  <p>כתובת המערכת: <a href="https://idaneamar.github.io/Agrix-CRM/">idaneamar.github.io/Agrix-CRM</a> · עובדת מכל מחשב ופלאפון · כל הנתונים נשמרים בענן</p>
+</header>
+
+<div class="card">
+  <h2>הרעיון בקצרה</h2>
+  <p>המערכת עוקבת אחרי כל שרשרת העסק שלך: <b>קונה סחורה מספק בחו"ל ← הסחורה נכנסת למלאי ← מוכר ומספק ללקוחות ← גובה כסף</b>. ככל שתזין יותר, המערכת תחזיר לך יותר: מי חייב לך כסף, כמה אתה באמת מרוויח על כל מוצר ולקוח, מתי המלאי נגמר, ומתי כל לקוח צריך את המשלוח הבא שלו.</p>
+  <div class="flow">
+    <span class="chip">1. מוצרים</span><span class="arrow">←</span>
+    <span class="chip">2. לקוחות</span><span class="arrow">←</span>
+    <span class="chip">3. מחירים ללקוח</span><span class="arrow">←</span>
+    <span class="chip">4. משלוחים</span><span class="arrow">←</span>
+    <span class="chip">5. ייבוא</span><span class="arrow">←</span>
+    <span class="chip">6. תשלומים</span>
+  </div>
+  <p class="muted">זה סדר ההזנה המומלץ בפעם הראשונה. מכאן והלאה — הכל שוטף.</p>
+</div>
+
+<div class="card">
+  <h2>🚀 התחלה: 6 צעדים ראשונים</h2>
+  <ol class="steps">
+    <li><b>היכנס</b> עם האימייל והסיסמה שלך (בפעם הראשונה — החלף סיסמה ב<b>הגדרות</b>).</li>
+    <li><b>התקן בפלאפון:</b> פתח את הכתובת בדפדפן הנייד ← תפריט ← <span class="kbd">הוספה למסך הבית</span>. מעכשיו זו אפליקציה רגילה שמתעדכנת לבד.</li>
+    <li><b>הגדר מוצרים</b> (הגדרות ← מוצרים): מקדמיה כבר קיימת. הוסף כל מוצר חדש שתתחיל לייבא, עם יחידת מידה ומחיר בסיס.</li>
+    <li><b>הוסף לקוח ראשון</b> (לקוחות ← <span class="kbd">+ לקוח חדש</span>): שם העסק, טלפון, כתובת מדויקת, תדירות אספקה ותנאי תשלום.</li>
+    <li><b>קבע לו מחירים</b> (בתוך כרטיס הלקוח ← מוצרים ומחירים): איזה מחיר סגרתם על כל מוצר וכמה הוא קונה בשבוע/חודש.</li>
+    <li><b>הזן את הקונטיינר</b> (ייבוא ← משלוחי ייבוא): מה הזמנת, בכמה, ומה העלויות. כשהוא ישוחרר מהמכס — סמן "שוחרר".</li>
+  </ol>
+</div>
+
+<div class="card">
+  <h2>🗺 מה יש בכל מסך</h2>
+  <table class="screens">
+    <tr><th>מסך</th><th>מה עושים בו</th><th>מה מקבלים ממנו</th></tr>
+    <tr>
+      <td>📊 ראשי</td>
+      <td>שום דבר — רק מסתכלים</td>
+      <td>תמונת מצב: התראות "דורש טיפול" (משלוח באיחור, מלאי נמוך, משימות המשך), משלוחים קרובים לכל לקוח, גרפים של הכנסות וכמויות</td>
+    </tr>
+    <tr>
+      <td>👥 לקוחות</td>
+      <td>הוספת לקוח, ובכרטיס שלו: תיעוד שיחות ("מה סגרנו"), מחירים, משלוחים, העלאת חשבוניות וחוזים</td>
+      <td>כל ההיסטוריה של הלקוח במקום אחד + חיוג/וואטסאפ/Waze בלחיצה</td>
+    </tr>
+    <tr>
+      <td>🚚 משלוחים</td>
+      <td>פתיחת משלוח מתוכנן ללקוח (המחירים נשלפים לבד!), סימון <span class="kbd">סופק ✓</span> כשמסרת</td>
+      <td>רשימת מה צריך לצאת ומתי, ו"מסלול יום" — כל המשלוחים של תאריך מסוים לפי ערים עם ניווט Waze</td>
+    </tr>
+    <tr>
+      <td>📦 ייבוא</td>
+      <td>הוספת ספקים, הזנת קונטיינרים (פריטים + הובלה/מכס/עמילות), עדכון סטטוס עד "שוחרר"</td>
+      <td>מלאי נוכחי, כמה שבועות הוא יחזיק, ועלות נחיתה אמיתית לק"ג</td>
+    </tr>
+    <tr>
+      <td>💰 כספים</td>
+      <td>רישום תשלום שקיבלת מלקוח</td>
+      <td>מי חייב לך וכמה, רווח אמיתי לפי מוצר ולפי לקוח, ייצוא לאקסל לרואה החשבון</td>
+    </tr>
+    <tr>
+      <td>⚙️ הגדרות</td>
+      <td>ניהול מוצרים, החלפת סיסמה</td>
+      <td>—</td>
+    </tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>📅 שגרת עבודה מומלצת</h2>
+  <h3>אחרי כל שיחה עם לקוח (חצי דקה)</h3>
+  <p>כרטיס הלקוח ← שיחות ← <span class="kbd">+ שיחה</span>. כתוב מה דובר, מה סגרתם, ואם צריך המשך — הזן "המשך טיפול" עם תאריך. המערכת תזכיר לך בלוח הראשי כשהגיע הזמן.</p>
+  <h3>כשסוגרים הזמנה</h3>
+  <p>משלוחים ← <span class="kbd">+ משלוח חדש</span> ← בחר לקוח ותאריך ← הוסף פריטים (המחיר שסגרתם נשלף אוטומטית). ביום המסירה — לחץ <span class="kbd">סופק ✓</span>. <b>הלחיצה הזאת חשובה:</b> היא שמעדכנת את המלאי, החוב וההכנסות.</p>
+  <h3>כשמגיע קונטיינר</h3>
+  <p>ייבוא ← משלוחי ייבוא ← עדכן את הסטטוס עד <b>"שוחרר"</b>. רק משלוח משוחרר נכנס למלאי ולחישוב העלויות.</p>
+  <h3>כשמקבלים כסף</h3>
+  <p>כספים ← חובות וגבייה ← <span class="kbd">+ תשלום</span> ליד הלקוח. היתרה שלו מתעדכנת מיד.</p>
+  <h3>פעם בשבוע (2 דקות)</h3>
+  <p>הצץ בלוח הראשי: יש התראות אדומות? מלאי נמוך? לקוח שאמור היה להזמין ולא הזמין? זה כל מה שצריך כדי להישאר בשליטה.</p>
+</div>
+
+<div class="card">
+  <h2>💡 איך הקסם עובד — מה כל הזנה נותנת</h2>
+  <table>
+    <tr><th>אם תזין…</th><th>תקבל…</th></tr>
+    <tr><td>תדירות אספקה ללקוח (שבועי/חודשי)</td><td>חיזוי "המשלוח הבא" בלוח הראשי, והתראה אם פספסת</td></tr>
+    <tr><td>כמות שבועית/חודשית לכל מוצר אצל הלקוח</td><td>חישוב ביקוש כולל ← כמה שבועות המלאי יחזיק ← מתי להזמין קונטיינר</td></tr>
+    <tr><td>מחיר שסגרת עם הלקוח</td><td>נשלף אוטומטית בכל משלוח חדש — בלי לזכור בעל־פה</td></tr>
+    <tr><td>קונטיינר עם כל העלויות (סחורה+הובלה+מכס)</td><td>עלות נחיתה אמיתית לק"ג ← רווח אמיתי על כל מכירה, לפי מוצר ולפי לקוח</td></tr>
+    <tr><td>סימון "סופק" על משלוחים</td><td>מלאי מתעדכן, חוב הלקוח גדל, ההכנסות נכנסות לגרפים</td></tr>
+    <tr><td>תשלומים שקיבלת</td><td>תמונת חובות מדויקת — מי חייב, כמה, ומתי שולם לאחרונה</td></tr>
+  </table>
+</div>
+
+<div class="card">
+  <h2>❓ שאלות נפוצות</h2>
+  <h3>עשיתי טעות בהזנה — מה עושים?</h3>
+  <p>כמעט הכל ניתן לעריכה (כפתור "עריכה") או למחיקה. טעות במלאי מתקנים ב: ייבוא ← מלאי ← <span class="kbd">תיקון</span> (למשל אחרי ספירת מחסן או פחת).</p>
+  <h3>למה הרווחיות מראה "—"?</h3>
+  <p>כי עדיין אין עלות נחיתה למוצר. היא מחושבת רק ממשלוח ייבוא בסטטוס <b>"שוחרר"</b> שמכיל את המוצר.</p>
+  <h3>מה זה "שער ₪" בהזנת קונטיינר?</h3>
+  <p>כמה שקלים שילמת על יחידת מטבע. קנית בדולר כשהשער 3.70? הזן 3.70. קנית בשקלים? בחר ILS והזן 1.</p>
+  <h3>איך מוציאים דוח לרואה החשבון?</h3>
+  <p>בכל טבלה במסכי ייבוא וכספים יש כפתור <span class="kbd">⬇ אקסל</span> — מוריד קובץ CSV שנפתח באקסל בעברית תקינה.</p>
+  <h3>המערכת התעדכנה לבד?</h3>
+  <p>כן, זה בכוונה. כל שיפור שנעשה נדחף לענן והאפליקציה מתעדכנת אוטומטית — גם בפלאפון, בלי להתקין כלום מחדש.</p>
+  <h3>הנתונים בטוחים?</h3>
+  <p>כן. הכל שמור בענן (Supabase) עם גיבוי של החיבור המוצפן, ורק מי שמחובר עם הסיסמה שלך רואה נתונים.</p>
+</div>
+
+<p class="muted" style="text-align:center">Agrix CRM · המדריך נכון לגרסה של אוגוסט 2026 · יש רעיון לשיפור? תגיד לקלוד 🙂</p>
+
+</div>
+</body>
+</html>
