@@ -6,7 +6,7 @@ import Modal from '../components/Modal.jsx'
 export const EMPTY_CUSTOMER = {
   name: '', contact_name: '', phone: '', email: '',
   city: '', street: '', address_notes: '',
-  delivery_frequency: 'weekly', status: 'active', notes: '',
+  delivery_frequency: 'weekly', status: 'active', payment_terms: '', notes: '',
 }
 
 export function CustomerForm({ initial, onSaved, onClose }) {
@@ -58,6 +58,8 @@ export function CustomerForm({ initial, onSaved, onClose }) {
           </select>
         </div>
       </div>
+      <label>תנאי תשלום (מזומן, שוטף+30…)</label>
+      <input value={f.payment_terms || ''} onChange={set('payment_terms')} />
       <label>הערות כלליות</label>
       <textarea value={f.notes || ''} onChange={set('notes')} />
       {err && <div className="error">{err}</div>}

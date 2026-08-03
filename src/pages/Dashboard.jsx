@@ -5,6 +5,7 @@ import {
 } from 'recharts'
 import { supabase, fmtMoney, fmtDate } from '../supabase.js'
 import { nextDeliveryFor, daysUntil } from '../nextDelivery.js'
+import { stockByProduct, weeklyDemandByProduct } from '../logic.js'
 
 const SERIES = ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#4a3aa7', '#e34948']
 
@@ -13,22 +14,74 @@ export default function Dashboard() {
   const [orders, setOrders] = useState([])
   const [items, setItems] = useState([])
   const [products, setProducts] = useState([])
+  const [extra, setExtra] = useState(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     Promise.all([
       supabase.from('customers').select('*'),
       supabase.from('orders').select('*'),
-      supabase.from('order_items').select('*, orders(delivery_date, status)'),
+      supabase.from('order_items').select('*, orders(delivery_date, status, customer_id)'),
       supabase.from('products').select('*'),
-    ]).then(([c, o, i, p]) => {
+      supabase.from('calls').select('id, customer_id, next_action, next_action_date').not('next_action', 'is', null),
+      supabase.from('import_shipments').select('*'),
+      supabase.from('import_items').select('*'),
+      supabase.from('stock_adjustments').select('*'),
+      supabase.from('customer_products').select('*'),
+    ]).then(([c, o, i, p, calls, sh, ii, adj, cps]) => {
       setCustomers(c.data || [])
       setOrders(o.data || [])
       setItems(i.data || [])
       setProducts(p.data || [])
+      setExtra({
+        calls: calls.data || [],
+        shipments: sh.data || [],
+        importItems: ii.data || [],
+        adjustments: adj.data || [],
+        cps: cps.data || [],
+      })
       setLoading(false)
     })
   }, [])
+
+  // Alerts: late deliveries, due follow-ups, low stock, incoming shipments
+  const alerts = useMemo(() => {
+    if (!extra) return []
+    const out = []
+    const today = new Date().toISOString().slice(0, 10)
+
+    orders
+      .filter((o) => o.status === 'planned' && o.delivery_date && o.delivery_date < today)
+      .forEach((o) => {
+        const c = customers.find((x) => x.id === o.customer_id)
+        out.push({ level: 'due', text: `משלוח באיחור ל${c?.name || 'לקוח'} (${fmtDate(o.delivery_date)})`, link: `/customers/${o.customer_id}` })
+      })
+
+    extra.calls
+      .filter((cl) => cl.next_action_date && cl.next_action_date <= today)
+      .forEach((cl) => {
+        const c = customers.find((x) => x.id === cl.customer_id)
+        out.push({ level: 'soon', text: `המשך טיפול: ${cl.next_action} — ${c?.name || ''}`, link: `/customers/${cl.customer_id}` })
+      })
+
+    const stock = stockByProduct(extra.importItems, extra.shipments, items, extra.adjustments)
+    const demand = weeklyDemandByProduct(extra.cps, customers)
+    products.filter((p) => p.active).forEach((p) => {
+      const d = demand[p.id] || 0
+      if (d <= 0) return
+      const weeks = (stock[p.id] || 0) / d
+      if (weeks < 2) out.push({ level: 'due', text: `מלאי נמוך: ${p.name} — כיסוי ל־${Math.max(0, weeks).toFixed(1)} שבועות בלבד`, link: '/import' })
+    })
+
+    extra.shipments
+      .filter((s) => ['at_sea', 'customs'].includes(s.status) && s.eta)
+      .forEach((s) => {
+        const d = daysUntil(s.eta)
+        if (d <= 7) out.push({ level: 'soon', text: `קונטיינר ${s.reference || ''} צפוי להגיע ${d <= 0 ? 'עכשיו' : `בעוד ${d} ימים`}`, link: '/import' })
+      })
+
+    return out.slice(0, 10)
+  }, [extra, orders, customers, products, items])
 
   const stats = useMemo(() => {
     const now = new Date()
@@ -103,6 +156,18 @@ export default function Dashboard() {
         <div className="card tile"><div className="val num">{stats.plannedThisWeek}</div><div className="lbl">משלוחים בשבוע הקרוב</div></div>
         <div className="card tile"><div className="val num">{stats.plannedCount}</div><div className="lbl">משלוחים מתוכננים</div></div>
       </div>
+
+      {alerts.length > 0 && (
+        <div className="card">
+          <h2>⚠ דורש טיפול</h2>
+          {alerts.map((a, i) => (
+            <Link key={i} to={a.link} className="list-item">
+              <span className={`badge ${a.level}`}>!</span>
+              <div className="grow">{a.text}</div>
+            </Link>
+          ))}
+        </div>
+      )}
 
       <div className="card">
         <div className="section-head">

@@ -7,6 +7,7 @@ import {
 import Modal from '../components/Modal.jsx'
 import { CustomerForm } from './Customers.jsx'
 import OrderForm from '../components/OrderForm.jsx'
+import { waLink, wazeLink } from '../logic.js'
 
 export default function CustomerDetail() {
   const { id } = useParams()
@@ -68,10 +69,18 @@ function InfoTab({ c, onDeleted }) {
     ['אימייל', c.email],
     ['כתובת', [c.street, c.city].filter(Boolean).join(', ')],
     ['הערות לכתובת', c.address_notes],
+    ['תנאי תשלום', c.payment_terms],
     ['הערות', c.notes],
   ]
+  const wa = waLink(c.phone)
+  const waze = wazeLink(c)
   return (
     <div className="card">
+      <div className="actions" style={{ marginTop: 0, marginBottom: 12, flexWrap: 'wrap' }}>
+        {c.phone && <a className="btn small" href={`tel:${c.phone}`}>📞 חיוג</a>}
+        {wa && <a className="btn small" style={{ background: '#25d366' }} href={wa} target="_blank" rel="noreferrer">💬 וואטסאפ</a>}
+        {waze && <a className="btn small" style={{ background: '#33ccff' }} href={waze} target="_blank" rel="noreferrer">🗺 Waze</a>}
+      </div>
       <table>
         <tbody>
           {rows.map(([k, v]) => (
