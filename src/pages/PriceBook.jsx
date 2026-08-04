@@ -2,14 +2,42 @@ import React, { useEffect, useMemo, useState } from 'react'
 import { supabase, fmtMoney, fmtDate } from '../supabase.js'
 import { downloadCsv } from '../logic.js'
 import { LOGO } from '../logo.js'
+import { CURRENCIES, useRates, toILS, fromILS, fmtCur } from '../rates.js'
 import Modal from '../components/Modal.jsx'
 
 const INCOTERMS = { EXW: 'EXW (מחצר הספק)', FOB: 'FOB (עד הנמל בחו"ל)', CIF: 'CIF (כולל הובלה וביטוח)', DDP: 'DDP (עד הדלת)', other: 'אחר' }
 const QUOTE_STATUS = { draft: 'טיוטה', sent: 'נשלחה', accepted: 'התקבלה', rejected: 'נדחתה' }
 
-export const costPerUnit = (q) =>
-  Number(q.unit_cost) * Number(q.fx_rate) + Number(q.freight_unit_cost) + Number(q.extra_unit_cost)
-export const salePrice = (q) => costPerUnit(q) * (1 + Number(q.margin_pct) / 100)
+// Total cost per unit in ILS, using live rates (falls back to the saved snapshot rate).
+export const costPerUnitILS = (q, rates) =>
+  toILS(q.unit_cost, q.currency, rates, q.fx_rate) +
+  toILS(q.freight_unit_cost, q.freight_currency || 'ILS', rates) +
+  toILS(q.extra_unit_cost, q.extra_currency || 'ILS', rates)
+
+export const salePriceILS = (q, rates) => costPerUnitILS(q, rates) * (1 + Number(q.margin_pct) / 100)
+
+// Which currency to display totals in: the single currency used, or ILS when mixed.
+export function displayCurrency(q) {
+  const used = new Set([q.currency || 'ILS'])
+  if (Number(q.freight_unit_cost) > 0) used.add(q.freight_currency || 'ILS')
+  if (Number(q.extra_unit_cost) > 0) used.add(q.extra_currency || 'ILS')
+  return used.size === 1 ? [...used][0] : 'ILS'
+}
+
+// Amount input with a currency selector beside it.
+function MoneyRow({ label, value, onValue, currency, onCurrency, required }) {
+  return (
+    <div>
+      <label>{label}</label>
+      <div style={{ display: 'flex', gap: 6 }}>
+        <input style={{ flex: 2 }} type="number" step="0.0001" min="0" value={value ?? ''} onChange={onValue} required={required} />
+        <select style={{ flex: 1, maxWidth: 110 }} value={currency || 'ILS'} onChange={onCurrency}>
+          {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
+    </div>
+  )
+}
 
 export default function PriceBook() {
   const [tab, setTab] = useState('calc')
@@ -34,6 +62,7 @@ function CalculatorTab() {
   const [suppliers, setSuppliers] = useState([])
   const [q, setQ] = useState('')
   const [editing, setEditing] = useState(null)
+  const { rates, updatedAt, refresh } = useRates()
 
   async function load() {
     const [r, s] = await Promise.all([
@@ -56,37 +85,50 @@ function CalculatorTab() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="ghost small" onClick={() =>
             downloadCsv('מחירון.csv',
-              ['מוצר', 'ספק', 'מדינה', 'תנאי', 'מחיר ספק', 'מטבע', 'שער', 'הובלה ליח׳', 'נוספות ליח׳', 'עלות ₪', '% רווח', 'מחיר מכירה ₪'],
-              filtered.map((r) => [r.product_name, r.supplier_name || '', r.country || '', r.incoterm, r.unit_cost, r.currency, r.fx_rate, r.freight_unit_cost, r.extra_unit_cost, costPerUnit(r).toFixed(2), r.margin_pct, salePrice(r).toFixed(2)]))
+              ['מוצר', 'ספק', 'מדינה', 'תנאי', 'מחיר ספק', 'מטבע', 'הובלה ליח׳', 'מטבע הובלה', 'נוספות ליח׳', 'מטבע נוספות', 'עלות ₪', '% רווח', 'מחיר מכירה ₪'],
+              filtered.map((r) => [r.product_name, r.supplier_name || '', r.country || '', r.incoterm, r.unit_cost, r.currency, r.freight_unit_cost, r.freight_currency || 'ILS', r.extra_unit_cost, r.extra_currency || 'ILS', costPerUnitILS(r, rates).toFixed(2), r.margin_pct, salePriceILS(r, rates).toFixed(2)]))
           }>⬇ אקסל</button>
           <button className="small" onClick={() => setEditing({})}>+ מחיר ספק</button>
         </div>
       </div>
+      <div className="small-text muted" style={{ marginBottom: 8 }}>
+        {rates
+          ? <>שערי המרה חיים · עודכן {updatedAt ? new Date(updatedAt).toLocaleString('he-IL', { dateStyle: 'short', timeStyle: 'short' }) : ''}{' '}
+              <button className="ghost small" type="button" onClick={() => refresh()}>↺ רענון שערים</button></>
+          : <>⚠ שערי מטבע לא זמינים כרגע (אין אינטרנט?) — מוצגים שערים אחרונים שנשמרו</>}
+      </div>
       <input placeholder="חיפוש מהיר: מוצר, ספק, מדינה…" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 12 }} />
       {filtered.length === 0 && <div className="empty">אין מחירים עדיין — הוסף מחיר ראשון מספק</div>}
-      {filtered.map((r) => (
-        <div key={r.id} className="list-item">
-          <div className="grow">
-            <div className="title">{r.product_name}</div>
-            <div className="sub">
-              {[r.supplier_name, r.country, INCOTERMS[r.incoterm]?.split(' ')[0]].filter(Boolean).join(' · ')}
-              {' · '}{Number(r.unit_cost)} {r.currency} × {Number(r.fx_rate)}
-              {Number(r.freight_unit_cost) > 0 && ` + הובלה ${Number(r.freight_unit_cost)}₪`}
-              {Number(r.extra_unit_cost) > 0 && ` + נוספות ${Number(r.extra_unit_cost)}₪`}
-              {' · '}{fmtDate(r.quote_date)}
+      {filtered.map((r) => {
+        const disp = displayCurrency(r)
+        const costI = costPerUnitILS(r, rates)
+        const saleI = salePriceILS(r, rates)
+        return (
+          <div key={r.id} className="list-item">
+            <div className="grow">
+              <div className="title">{r.product_name}</div>
+              <div className="sub">
+                {[r.supplier_name, r.country, INCOTERMS[r.incoterm]?.split(' ')[0]].filter(Boolean).join(' · ')}
+                {' · '}מחיר ספק {fmtCur(Number(r.unit_cost), r.currency)}
+                {Number(r.freight_unit_cost) > 0 && ` + הובלה ${fmtCur(Number(r.freight_unit_cost), r.freight_currency || 'ILS')}`}
+                {Number(r.extra_unit_cost) > 0 && ` + נוספות ${fmtCur(Number(r.extra_unit_cost), r.extra_currency || 'ILS')}`}
+                {' · '}{fmtDate(r.quote_date)}
+              </div>
+              <div className="sub num">
+                עלות: <b>{fmtCur(fromILS(costI, disp, rates), disp)}</b> / {r.unit} · רווח {Number(r.margin_pct)}% ←{' '}
+                <b style={{ color: 'var(--good-text)', fontSize: '1.05em' }}>מכירה: {fmtCur(fromILS(saleI, disp, rates), disp)} / {r.unit}</b>
+                {disp !== 'ILS' && <span className="muted"> ({fmtMoney(saleI)})</span>}
+              </div>
             </div>
-            <div className="sub num">
-              עלות: <b>{fmtMoney(costPerUnit(r))}</b> / {r.unit} · רווח {Number(r.margin_pct)}% ←{' '}
-              <b style={{ color: 'var(--good-text)', fontSize: '1.05em' }}>מכירה: {fmtMoney(salePrice(r))} / {r.unit}</b>
-            </div>
+            <button className="ghost small" onClick={() => setEditing(r)}>עריכה</button>
           </div>
-          <button className="ghost small" onClick={() => setEditing(r)}>עריכה</button>
-        </div>
-      ))}
+        )
+      })}
       {editing && (
         <QuoteCalcForm
           initial={editing.id ? editing : null}
           suppliers={suppliers}
+          rates={rates}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load() }}
         />
@@ -95,11 +137,12 @@ function CalculatorTab() {
   )
 }
 
-function QuoteCalcForm({ initial, suppliers, onClose, onSaved }) {
+function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
   const [f, setF] = useState(initial || {
     product_name: '', supplier_id: '', supplier_name: '', country: '', incoterm: 'FOB',
-    unit: 'kg', unit_cost: '', currency: 'USD', fx_rate: '', freight_unit_cost: 0,
-    extra_unit_cost: 0, margin_pct: 30, quote_date: new Date().toISOString().slice(0, 10), notes: '',
+    unit: 'kg', unit_cost: '', currency: 'USD', freight_unit_cost: 0, freight_currency: 'ILS',
+    extra_unit_cost: 0, extra_currency: 'ILS', margin_pct: 30,
+    quote_date: new Date().toISOString().slice(0, 10), notes: '',
   })
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
@@ -111,15 +154,19 @@ function QuoteCalcForm({ initial, suppliers, onClose, onSaved }) {
   }
 
   const preview = {
-    unit_cost: Number(f.unit_cost) || 0, fx_rate: Number(f.fx_rate) || 0,
-    freight_unit_cost: Number(f.freight_unit_cost) || 0, extra_unit_cost: Number(f.extra_unit_cost) || 0,
+    unit_cost: Number(f.unit_cost) || 0, currency: f.currency, fx_rate: f.fx_rate,
+    freight_unit_cost: Number(f.freight_unit_cost) || 0, freight_currency: f.freight_currency,
+    extra_unit_cost: Number(f.extra_unit_cost) || 0, extra_currency: f.extra_currency,
     margin_pct: Number(f.margin_pct) || 0,
   }
-  const cost = costPerUnit(preview)
-  const sale = salePrice(preview)
+  const disp = displayCurrency(preview)
+  const costI = costPerUnitILS(preview, rates)
+  const saleI = salePriceILS(preview, rates)
 
   async function save(e) {
     e.preventDefault(); setErr('')
+    // Snapshot the current unit-currency rate for offline fallback / history.
+    const snap = f.currency === 'ILS' ? 1 : (rates?.[f.currency] ? 1 / rates[f.currency] : Number(initial?.fx_rate) || 1)
     const row = {
       product_name: f.product_name,
       supplier_id: f.supplier_id || null,
@@ -129,9 +176,11 @@ function QuoteCalcForm({ initial, suppliers, onClose, onSaved }) {
       unit: f.unit,
       unit_cost: Number(f.unit_cost),
       currency: f.currency,
-      fx_rate: Number(f.fx_rate) || 1,
+      fx_rate: Math.round(snap * 10000) / 10000,
       freight_unit_cost: Number(f.freight_unit_cost) || 0,
+      freight_currency: f.freight_currency || 'ILS',
       extra_unit_cost: Number(f.extra_unit_cost) || 0,
+      extra_currency: f.extra_currency || 'ILS',
       margin_pct: Number(f.margin_pct) || 0,
       quote_date: f.quote_date,
       notes: f.notes || null,
@@ -173,37 +222,28 @@ function QuoteCalcForm({ initial, suppliers, onClose, onSaved }) {
           </div>
         </div>
         <div className="formrow">
-          <div><label>מחיר הספק (ליחידה) *</label><input type="number" step="0.0001" min="0" value={f.unit_cost} onChange={set('unit_cost')} required /></div>
-          <div>
-            <label>מטבע</label>
-            <select value={f.currency} onChange={set('currency')}>
-              <option>USD</option><option>EUR</option><option>ILS</option>
-            </select>
-          </div>
-        </div>
-        <div className="formrow">
-          <div><label>שער ₪ (ל-ILS הזן 1)</label><input type="number" step="0.0001" min="0" value={f.fx_rate} onChange={set('fx_rate')} required /></div>
           <div>
             <label>יחידה</label>
             <select value={f.unit} onChange={set('unit')}>
               <option value="kg">ק״ג</option><option value="unit">יחידה</option><option value="carton">קרטון</option>
             </select>
           </div>
+          <div />
         </div>
-        <div className="formrow">
-          <div><label>הובלה ליחידה (₪) — רלוונטי ל-FOB/EXW</label><input type="number" step="0.0001" min="0" value={f.freight_unit_cost} onChange={set('freight_unit_cost')} /></div>
-          <div><label>עלויות נוספות ליחידה (₪)</label><input type="number" step="0.0001" min="0" value={f.extra_unit_cost} onChange={set('extra_unit_cost')} /></div>
-        </div>
+        <MoneyRow label="מחיר הספק (ליחידה) *" required value={f.unit_cost} onValue={set('unit_cost')} currency={f.currency} onCurrency={set('currency')} />
+        <MoneyRow label="הובלה ליחידה — רלוונטי ל-FOB/EXW" value={f.freight_unit_cost} onValue={set('freight_unit_cost')} currency={f.freight_currency} onCurrency={set('freight_currency')} />
+        <MoneyRow label="עלויות נוספות ליחידה" value={f.extra_unit_cost} onValue={set('extra_unit_cost')} currency={f.extra_currency} onCurrency={set('extra_currency')} />
         <label>אחוז רווח רצוי (%)</label>
         <input type="number" step="0.1" min="0" value={f.margin_pct} onChange={set('margin_pct')} />
         <label>הערות</label>
         <input value={f.notes || ''} onChange={set('notes')} />
 
         <div className="card" style={{ marginTop: 14, background: 'var(--page)' }}>
-          <div className="num">עלות כוללת ליחידה: <b>{fmtMoney(cost)}</b></div>
+          <div className="num">עלות כוללת ליחידה: <b>{fmtCur(fromILS(costI, disp, rates), disp)}</b>{disp !== 'ILS' && <span className="muted"> ({fmtMoney(costI)})</span>}</div>
           <div className="num" style={{ fontSize: '1.15rem', color: 'var(--good-text)' }}>
-            מחיר מכירה מומלץ: <b>{fmtMoney(sale)}</b>
+            מחיר מכירה מומלץ: <b>{fmtCur(fromILS(saleI, disp, rates), disp)}</b>{disp !== 'ILS' && <span className="muted"> ({fmtMoney(saleI)})</span>}
           </div>
+          <div className="small-text muted">מחושב לפי שער עדכני — המחיר יתעדכן אוטומטית עם השער</div>
         </div>
 
         {err && <div className="error">{err}</div>}
@@ -226,6 +266,7 @@ function QuotesTab() {
   const [products, setProducts] = useState([])
   const [cps, setCps] = useState([])
   const [editing, setEditing] = useState(null)
+  const { rates } = useRates()
 
   async function load() {
     const [qs, c, pb, p, cp] = await Promise.all([
@@ -284,6 +325,7 @@ function QuotesTab() {
           priceBook={priceBook}
           products={products}
           cps={cps}
+          rates={rates}
           onClose={() => setEditing(null)}
           onSaved={() => { setEditing(null); load() }}
         />
@@ -292,7 +334,7 @@ function QuotesTab() {
   )
 }
 
-function QuoteForm({ initial, customers, priceBook, products, cps, onClose, onSaved }) {
+function QuoteForm({ initial, customers, priceBook, products, cps, rates, onClose, onSaved }) {
   const [customerId, setCustomerId] = useState(initial?.customer_id || '')
   const [customerName, setCustomerName] = useState(initial?.customer_name || '')
   const [validUntil, setValidUntil] = useState(initial?.valid_until || defaultValidity())
@@ -319,10 +361,10 @@ function QuoteForm({ initial, customers, priceBook, products, cps, onClose, onSa
       list.push({ label: p.name, unit: p.unit, price: agreed?.agreed_price ?? p.default_price ?? '' })
     })
     priceBook.forEach((r) => {
-      list.push({ label: `${r.product_name}${r.country ? ` (${r.country})` : ''}`, unit: r.unit, price: Math.round(salePrice(r) * 100) / 100 })
+      list.push({ label: `${r.product_name}${r.country ? ` (${r.country})` : ''}`, unit: r.unit, price: Math.round(salePriceILS(r, rates) * 100) / 100 })
     })
     return list
-  }, [products, priceBook, cps, customerId])
+  }, [products, priceBook, cps, customerId, rates])
 
   function pickCustomer(e) {
     const id = e.target.value
