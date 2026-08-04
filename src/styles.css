@@ -79,7 +79,8 @@ h3 { font-size: 1rem; }
 }
 .bottomnav a {
   display: flex; flex-direction: column; align-items: center; gap: 2px;
-  color: var(--muted); font-size: 0.72rem; padding: 4px 10px; border-radius: 8px;
+  color: var(--muted); font-size: 0.68rem; padding: 4px 4px; border-radius: 8px;
+  min-width: 0; flex: 1; text-align: center; white-space: nowrap;
 }
 .bottomnav a.active { color: var(--brand); font-weight: 600; }
 .bottomnav .icon { font-size: 1.25rem; line-height: 1; }

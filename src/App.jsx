@@ -8,6 +8,7 @@ import CustomerDetail from './pages/CustomerDetail.jsx'
 import Orders from './pages/Orders.jsx'
 import ImportPage from './pages/Import.jsx'
 import Finance from './pages/Finance.jsx'
+import PriceBook from './pages/PriceBook.jsx'
 import Settings from './pages/Settings.jsx'
 
 export default function App() {
@@ -38,6 +39,7 @@ export default function App() {
             <Route path="/orders" element={<Orders />} />
             <Route path="/import" element={<ImportPage />} />
             <Route path="/finance" element={<Finance />} />
+            <Route path="/prices" element={<PriceBook />} />
             <Route path="/settings" element={<Settings />} />
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
@@ -54,6 +56,9 @@ export default function App() {
           </NavLink>
           <NavLink to="/import" className={({ isActive }) => (isActive ? 'active' : '')}>
             <span className="icon">📦</span>ייבוא
+          </NavLink>
+          <NavLink to="/prices" className={({ isActive }) => (isActive ? 'active' : '')}>
+            <span className="icon">🏷️</span>מחירון
           </NavLink>
           <NavLink to="/finance" className={({ isActive }) => (isActive ? 'active' : '')}>
             <span className="icon">💰</span>כספים
