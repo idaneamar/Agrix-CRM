@@ -24,17 +24,19 @@ export default function Dashboard() {
       supabase.from('order_items').select('*, orders(delivery_date, status, customer_id)'),
       supabase.from('products').select('*'),
       supabase.from('calls').select('id, customer_id, next_action, next_action_date').not('next_action', 'is', null),
+      supabase.from('quotes').select('id, quote_number, customer_name, status, updated_at').eq('status', 'sent'),
       supabase.from('import_shipments').select('*'),
       supabase.from('import_items').select('*'),
       supabase.from('stock_adjustments').select('*'),
       supabase.from('customer_products').select('*'),
-    ]).then(([c, o, i, p, calls, sh, ii, adj, cps]) => {
+    ]).then(([c, o, i, p, calls, sentQuotes, sh, ii, adj, cps]) => {
       setCustomers(c.data || [])
       setOrders(o.data || [])
       setItems(i.data || [])
       setProducts(p.data || [])
       setExtra({
         calls: calls.data || [],
+        sentQuotes: sentQuotes.data || [],
         shipments: sh.data || [],
         importItems: ii.data || [],
         adjustments: adj.data || [],
@@ -71,6 +73,12 @@ export default function Dashboard() {
       if (d <= 0) return
       const weeks = (stock[p.id] || 0) / d
       if (weeks < 2) out.push({ level: 'due', text: `מלאי נמוך: ${p.name} — כיסוי ל־${Math.max(0, weeks).toFixed(1)} שבועות בלבד`, link: '/import' })
+    })
+
+    // Sent quotes with no response for 5+ days
+    ;(extra.sentQuotes || []).forEach((sq) => {
+      const days = Math.floor((Date.now() - new Date(sq.updated_at).getTime()) / 86400000)
+      if (days >= 5) out.push({ level: 'soon', text: `הצעת מחיר #${sq.quote_number} ל${sq.customer_name} ממתינה למענה כבר ${days} ימים — שווה להתקשר`, link: '/prices' })
     })
 
     extra.shipments
@@ -128,7 +136,7 @@ export default function Dashboard() {
     })
     return Object.entries(map)
       .map(([pid, qty]) => ({
-        name: products.find((p) => p.id === pid)?.name || '?',
+        name: products.find((p) => p.id === pid)?.name || 'אחר',
         qty: Math.round(qty * 100) / 100,
       }))
       .sort((a, b) => b.qty - a.qty)

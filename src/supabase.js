@@ -17,6 +17,7 @@ export const FREQ_DAYS = { weekly: 7, biweekly: 14, monthly: 30 }
 export const STATUS_LABELS = { lead: 'ליד', active: 'פעיל', inactive: 'לא פעיל' }
 export const ORDER_STATUS_LABELS = { planned: 'מתוכנן', delivered: 'סופק', canceled: 'בוטל' }
 export const KIND_LABELS = { invoice: 'חשבונית', contract: 'חוזה', other: 'אחר' }
+export const IMPORT_KIND_LABELS = { bl: 'שטר מטען (BL)', customs: 'מסמכי מכס', supplier_invoice: 'חשבונית ספק', other: 'אחר' }
 
 export const fmtMoney = (n) =>
   n == null ? '—' : new Intl.NumberFormat('he-IL', { style: 'currency', currency: 'ILS', maximumFractionDigits: 2 }).format(n)

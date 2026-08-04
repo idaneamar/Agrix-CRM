@@ -289,12 +289,48 @@ function QuotesTab() {
     load()
   }
 
+  const [converted, setConverted] = useState(null)
+
+  // One-click: quote -> planned order. Items match products by name; unmatched become description lines.
+  async function toOrder(quote) {
+    if (!quote.customer_id) {
+      setConverted({ error: `הצעה #${quote.quote_number} לא מקושרת ללקוח קיים — פתח אותה לעריכה ובחר לקוח מהרשימה, ואז נסה שוב.` })
+      return
+    }
+    const { data: order, error } = await supabase.from('orders')
+      .insert({
+        customer_id: quote.customer_id,
+        delivery_date: new Date().toISOString().slice(0, 10),
+        notes: `מהצעת מחיר #${quote.quote_number}`,
+      }).select().single()
+    if (error) { setConverted({ error: error.message }); return }
+    const items = (quote.quote_items || []).map((it) => {
+      const match = products.find((p) => p.name.trim() === it.description.trim().split(' (')[0])
+      return {
+        order_id: order.id,
+        product_id: match?.id || null,
+        description: match ? null : it.description,
+        quantity: Number(it.quantity),
+        unit_price: Number(it.unit_price),
+      }
+    })
+    if (items.length) {
+      const res = await supabase.from('order_items').insert(items)
+      if (res.error) { setConverted({ error: res.error.message }); return }
+    }
+    await supabase.from('quotes').update({ status: 'accepted' }).eq('id', quote.id)
+    setConverted({ ok: `הצעה #${quote.quote_number} הפכה למשלוח מתוכנן להיום. עדכן את תאריך האספקה במסך המשלוחים.` })
+    load()
+  }
+
   return (
     <div className="card">
       <div className="section-head">
         <h2>הצעות מחיר</h2>
         <button className="small" onClick={() => setEditing({})}>+ הצעת מחיר</button>
       </div>
+      {converted?.ok && <div className="success">{converted.ok}</div>}
+      {converted?.error && <div className="error">{converted.error}</div>}
       {quotes.length === 0 && <div className="empty">אין הצעות מחיר — צור את הראשונה</div>}
       {quotes.map((quote) => {
         const subtotal = (quote.quote_items || []).reduce((t, it) => t + Number(it.quantity) * Number(it.unit_price), 0)
@@ -314,7 +350,9 @@ function QuotesTab() {
             <button className="ghost small" onClick={() => printQuote(quote)}>🖨 הדפסה</button>
             <button className="ghost small" onClick={() => setEditing(quote)}>עריכה</button>
             {quote.status === 'draft' && <button className="ghost small" onClick={() => setStatus(quote, 'sent')}>נשלחה ✓</button>}
-            {quote.status === 'sent' && <button className="ghost small" onClick={() => setStatus(quote, 'accepted')}>התקבלה ✓</button>}
+            {(quote.status === 'sent' || quote.status === 'accepted') && (
+              <button className="ghost small" onClick={() => toOrder(quote)}>🚚 ← הזמנה</button>
+            )}
           </div>
         )
       })}

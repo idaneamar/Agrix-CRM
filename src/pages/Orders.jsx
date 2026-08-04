@@ -15,7 +15,7 @@ export default function Orders() {
   async function load() {
     const [o, c] = await Promise.all([
       supabase.from('orders')
-        .select('*, customers(name, city, street, phone, address_notes), order_items(quantity, unit_price, products(name, unit))')
+        .select('*, customers(name, city, street, phone, address_notes), order_items(quantity, unit_price, description, products(name, unit))')
         .order('delivery_date', { ascending: filter === 'planned', nullsFirst: false }),
       supabase.from('customers').select('id, name').order('name'),
     ])
@@ -59,7 +59,7 @@ export default function Orders() {
                 </div>
                 <div className="sub">
                   {fmtDate(o.delivery_date)} · <span className="num">{fmtMoney(total)}</span>
-                  {(o.order_items || []).length > 0 && ' · ' + o.order_items.map((it) => `${it.products?.name} ×${it.quantity}`).join(', ')}
+                  {(o.order_items || []).length > 0 && ' · ' + o.order_items.map((it) => `${it.products?.name || it.description || '?'} ×${it.quantity}`).join(', ')}
                 </div>
               </div>
               {o.status === 'planned' && d != null && d < 0 && <span className="badge due">באיחור</span>}
@@ -112,7 +112,7 @@ function DayRoute({ orders }) {
                   <div className="title"><Link to={`/customers/${o.customer_id}`}>{o.customers?.name}</Link></div>
                   <div className="sub">
                     {[o.customers?.street, o.customers?.address_notes].filter(Boolean).join(' · ') || 'אין כתובת'}
-                    {(o.order_items || []).length > 0 && ' · ' + o.order_items.map((it) => `${it.products?.name} ×${it.quantity}`).join(', ')}
+                    {(o.order_items || []).length > 0 && ' · ' + o.order_items.map((it) => `${it.products?.name || it.description || '?'} ×${it.quantity}`).join(', ')}
                   </div>
                 </div>
                 {waze && <a className="btn small" style={{ background: '#33ccff' }} href={waze} target="_blank" rel="noreferrer">🗺</a>}

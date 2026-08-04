@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { supabase, fmtMoney, fmtDate } from '../supabase.js'
+import { supabase, fmtMoney, fmtDate, IMPORT_KIND_LABELS } from '../supabase.js'
 import { SHIPMENT_STATUS, landedCosts, stockByProduct, weeklyDemandByProduct, downloadCsv } from '../logic.js'
 import Modal from '../components/Modal.jsx'
 
@@ -141,6 +141,7 @@ function ShipmentsTab() {
   const [suppliers, setSuppliers] = useState([])
   const [products, setProducts] = useState([])
   const [editing, setEditing] = useState(null)
+  const [docsFor, setDocsFor] = useState(null)
 
   async function load() {
     const [s, sup, p] = await Promise.all([
@@ -194,10 +195,12 @@ function ShipmentsTab() {
                 → {SHIPMENT_STATUS[NEXT[sh.status]]}
               </button>
             )}
+            <button className="ghost small" onClick={() => setDocsFor(sh)}>📎</button>
             <button className="ghost small" onClick={() => setEditing(sh)}>עריכה</button>
           </div>
         )
       })}
+      {docsFor && <ShipmentDocs shipment={docsFor} onClose={() => setDocsFor(null)} />}
       {editing && (
         <ShipmentForm
           initial={editing.id ? editing : null}
@@ -337,6 +340,80 @@ function ShipmentForm({ initial, suppliers, products, onClose, onSaved }) {
           <button type="button" className="ghost" onClick={onClose}>ביטול</button>
         </div>
       </form>
+    </Modal>
+  )
+}
+
+/* ---------- Shipment documents (BL, customs, supplier invoices) ---------- */
+
+function ShipmentDocs({ shipment, onClose }) {
+  const [files, setFiles] = useState([])
+  const [busy, setBusy] = useState(false)
+  const [kind, setKind] = useState('bl')
+  const [err, setErr] = useState('')
+
+  async function load() {
+    const { data } = await supabase.from('attachments').select('*').eq('shipment_id', shipment.id).order('created_at', { ascending: false })
+    setFiles(data || [])
+  }
+  useEffect(() => { load() }, [shipment.id])
+
+  async function upload(e) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setBusy(true); setErr('')
+    const path = `shipments/${shipment.id}/${Date.now()}-${file.name}`
+    const up = await supabase.storage.from('attachments').upload(path, file)
+    if (up.error) { setErr(up.error.message); setBusy(false); return }
+    const ins = await supabase.from('attachments').insert({
+      shipment_id: shipment.id, kind, title: file.name, file_path: path,
+      file_size: file.size, mime_type: file.type,
+    })
+    if (ins.error) setErr(ins.error.message)
+    setBusy(false)
+    e.target.value = ''
+    load()
+  }
+
+  async function open(f) {
+    const { data, error } = await supabase.storage.from('attachments').createSignedUrl(f.file_path, 3600)
+    if (!error) window.open(data.signedUrl, '_blank')
+  }
+
+  async function del(f) {
+    await supabase.storage.from('attachments').remove([f.file_path])
+    await supabase.from('attachments').delete().eq('id', f.id)
+    load()
+  }
+
+  return (
+    <Modal title={`מסמכי משלוח ${shipment.reference || ''}`} onClose={onClose}>
+      <div style={{ display: 'flex', gap: 12, alignItems: 'end', flexWrap: 'wrap' }}>
+        <div style={{ flex: 1, minWidth: 140 }}>
+          <label>סוג מסמך</label>
+          <select value={kind} onChange={(e) => setKind(e.target.value)}>
+            {Object.entries(IMPORT_KIND_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+          </select>
+        </div>
+        <label className="btn" style={{ marginBottom: 0 }}>
+          {busy ? 'מעלה…' : '📎 העלאת קובץ'}
+          <input type="file" style={{ display: 'none' }} onChange={upload} disabled={busy} />
+        </label>
+      </div>
+      {err && <div className="error">{err}</div>}
+      <div style={{ marginTop: 12 }}>
+        {files.length === 0 && <div className="empty">אין מסמכים למשלוח זה</div>}
+        {files.map((f) => (
+          <div key={f.id} className="list-item">
+            <div className="grow">
+              <div className="title">{f.title}</div>
+              <div className="sub">{IMPORT_KIND_LABELS[f.kind] || f.kind} · {fmtDate(f.created_at)}</div>
+            </div>
+            <button className="ghost small" onClick={() => open(f)}>פתיחה</button>
+            <button className="ghost small" onClick={() => del(f)}>🗑</button>
+          </div>
+        ))}
+      </div>
     </Modal>
   )
 }

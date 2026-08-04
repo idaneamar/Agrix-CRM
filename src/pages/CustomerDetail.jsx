@@ -296,7 +296,7 @@ function OrdersTab({ customerId }) {
   async function load() {
     const { data } = await supabase
       .from('orders')
-      .select('*, order_items(quantity, unit_price, products(name, unit))')
+      .select('*, order_items(quantity, unit_price, description, products(name, unit))')
       .eq('customer_id', customerId)
       .order('delivery_date', { ascending: false, nullsFirst: false })
     setOrders(data || [])
@@ -322,7 +322,7 @@ function OrdersTab({ customerId }) {
             <div className="grow">
               <div className="title">{fmtDate(o.delivery_date)} · <span className="num">{fmtMoney(total)}</span></div>
               <div className="sub">
-                {(o.order_items || []).map((it) => `${it.products?.name} ×${it.quantity}${it.products?.unit ? ` ${it.products.unit}` : ''}`).join(' · ') || 'ללא פריטים'}
+                {(o.order_items || []).map((it) => `${it.products?.name || it.description || '?'} ×${it.quantity}${it.products?.unit ? ` ${it.products.unit}` : ''}`).join(' · ') || 'ללא פריטים'}
               </div>
               {o.notes && <div className="small-text muted">{o.notes}</div>}
             </div>

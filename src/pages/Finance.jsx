@@ -10,11 +10,12 @@ export default function Finance() {
     <div>
       <h1>כספים</h1>
       <div className="tabs">
-        {[['debts', 'חובות וגבייה'], ['profit', 'רווחיות'], ['payments', 'תשלומים אחרונים']].map(([k, v]) => (
+        {[['debts', 'חובות וגבייה'], ['cashflow', 'תזרים צפוי'], ['profit', 'רווחיות'], ['payments', 'תשלומים אחרונים']].map(([k, v]) => (
           <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>{v}</button>
         ))}
       </div>
       {tab === 'debts' && <DebtsTab />}
+      {tab === 'cashflow' && <CashflowTab />}
       {tab === 'profit' && <ProfitTab />}
       {tab === 'payments' && <PaymentsTab />}
     </div>
@@ -121,6 +122,104 @@ function PaymentForm({ customer, onClose, onSaved }) {
         </div>
       </form>
     </Modal>
+  )
+}
+
+/* ---------- Cash flow forecast ---------- */
+
+function CashflowTab() {
+  const [data, setData] = useState(null)
+
+  useEffect(() => {
+    Promise.all([
+      supabase.from('orders').select('id, customer_id, delivery_date, status, customers(name), order_items(quantity, unit_price)').eq('status', 'planned'),
+      supabase.from('order_items').select('quantity, unit_price, orders(status, customer_id)'),
+      supabase.from('payments').select('customer_id, amount'),
+      supabase.from('customers').select('id, name'),
+      supabase.from('import_shipments').select('*, suppliers(name), import_items(quantity, unit_cost, fx_rate)').in('status', ['ordered', 'at_sea', 'customs']),
+    ]).then(([o, oi, p, c, sh]) => setData({
+      planned: o.data || [], orderItems: oi.data || [], payments: p.data || [],
+      customers: c.data || [], incoming: sh.data || [],
+    }))
+  }, [])
+
+  const model = useMemo(() => {
+    if (!data) return null
+    const today = new Date(); today.setHours(0, 0, 0, 0)
+    const horizon = new Date(today); horizon.setDate(today.getDate() + 30)
+
+    const events = []
+
+    // Open debts — money that is already owed (treat as due now)
+    const bal = balanceByCustomer(data.orderItems, data.payments)
+    let openDebt = 0
+    Object.entries(bal).forEach(([cid, b]) => { if (b > 0.005) openDebt += b })
+
+    // Planned deliveries within 30 days — expected income on delivery
+    data.planned.forEach((o) => {
+      if (!o.delivery_date) return
+      const d = new Date(o.delivery_date)
+      if (d > horizon) return
+      const total = (o.order_items || []).reduce((t, it) => t + Number(it.quantity) * Number(it.unit_price), 0)
+      if (total > 0) events.push({ date: o.delivery_date < today.toISOString().slice(0, 10) ? today.toISOString().slice(0, 10) : o.delivery_date, label: `אספקה ל${o.customers?.name || 'לקוח'}`, amount: total })
+    })
+
+    // Incoming containers — expected payment out around ETA (estimate)
+    data.incoming.forEach((s) => {
+      const goods = (s.import_items || []).reduce((t, it) => t + Number(it.quantity) * Number(it.unit_cost) * Number(it.fx_rate), 0)
+      const extras = Number(s.freight_cost) + Number(s.customs_cost) + Number(s.agent_cost) + Number(s.inland_cost)
+      const total = goods + extras
+      if (total <= 0) return
+      const when = s.eta || horizon.toISOString().slice(0, 10)
+      if (new Date(when) > horizon) return
+      events.push({ date: when < today.toISOString().slice(0, 10) ? today.toISOString().slice(0, 10) : when, label: `קונטיינר ${s.reference || ''}${s.suppliers?.name ? ` (${s.suppliers.name})` : ''}`, amount: -total })
+    })
+
+    events.sort((a, b) => a.date.localeCompare(b.date))
+    const totalIn = events.filter((e) => e.amount > 0).reduce((t, e) => t + e.amount, 0) + openDebt
+    const totalOut = -events.filter((e) => e.amount < 0).reduce((t, e) => t + e.amount, 0)
+    return { events, openDebt, totalIn, totalOut, net: totalIn - totalOut }
+  }, [data])
+
+  if (!data || !model) return <div className="empty">טוען…</div>
+
+  return (
+    <div className="card">
+      <h2>תזרים צפוי — 30 הימים הקרובים</h2>
+      <div className="grid2" style={{ marginBottom: 12 }}>
+        <div className="card tile" style={{ marginBottom: 0 }}>
+          <div className="val num" style={{ color: 'var(--good-text)' }}>{fmtMoney(model.totalIn)}</div>
+          <div className="lbl">צפוי להיכנס (חובות פתוחים + אספקות מתוכננות)</div>
+        </div>
+        <div className="card tile" style={{ marginBottom: 0 }}>
+          <div className="val num" style={{ color: 'var(--critical)' }}>{fmtMoney(model.totalOut)}</div>
+          <div className="lbl">צפוי לצאת (קונטיינרים בדרך)</div>
+        </div>
+      </div>
+      <div className="card tile" style={{ background: 'var(--page)' }}>
+        <div className="val num" style={{ color: model.net >= 0 ? 'var(--good-text)' : 'var(--critical)' }}>{fmtMoney(model.net)}</div>
+        <div className="lbl">מאזן צפוי נטו</div>
+      </div>
+
+      {model.openDebt > 0 && (
+        <div className="list-item">
+          <div className="grow"><div className="title">חובות פתוחים של לקוחות</div><div className="sub">כסף שכבר מגיע לך — לגבייה</div></div>
+          <span className="num" style={{ color: 'var(--good-text)' }}><b>{fmtMoney(model.openDebt)}</b></span>
+        </div>
+      )}
+      {model.events.map((e, i) => (
+        <div key={i} className="list-item">
+          <div className="grow"><div className="title">{e.label}</div><div className="sub">{fmtDate(e.date)}</div></div>
+          <span className="num" style={{ color: e.amount >= 0 ? 'var(--good-text)' : 'var(--critical)' }}>
+            <b>{e.amount >= 0 ? '+' : ''}{fmtMoney(e.amount)}</b>
+          </span>
+        </div>
+      ))}
+      {model.events.length === 0 && model.openDebt === 0 && <div className="empty">אין תנועות צפויות — הוסף משלוחים מתוכננים וקונטיינרים בדרך</div>}
+      <div className="small-text muted" style={{ marginTop: 10 }}>
+        הערכה בלבד: הכנסות לפי תאריכי אספקה מתוכננים, הוצאות לפי צפי הגעת קונטיינרים (ETA). תנאי תשלום בפועל עשויים להזיז את התזרים.
+      </div>
+    </div>
   )
 }
 

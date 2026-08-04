@@ -50,6 +50,7 @@ export function stockByProduct(importItems, shipments, orderItems, adjustments) 
     if (released.has(it.shipment_id)) stock[it.product_id] = (stock[it.product_id] || 0) + Number(it.quantity)
   })
   orderItems.forEach((it) => {
+    if (!it.product_id) return
     if (it.orders?.status === 'delivered') stock[it.product_id] = (stock[it.product_id] || 0) - Number(it.quantity)
   })
   adjustments.forEach((a) => {

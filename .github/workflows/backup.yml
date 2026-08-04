@@ -1,0 +1,30 @@
+name: Weekly database backup
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # every Monday 03:00 UTC (06:00 Israel)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Export all tables
+        env:
+          SUPABASE_URL: https://efbsagtokdstcaxvtqan.supabase.co
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+        run: node scripts/backup.mjs
+      - name: Commit backup
+        run: |
+          git config user.name "agrix-backup-bot"
+          git config user.email "backup@agrix.local"
+          git add backups/
+          git diff --cached --quiet || git commit -m "Weekly backup $(date -u +%F)"
+          git push
