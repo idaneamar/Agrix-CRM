@@ -6,7 +6,14 @@ import { CURRENCIES, useRates, toILS, fromILS, fmtCur } from '../rates.js'
 import Modal from '../components/Modal.jsx'
 
 const INCOTERMS = { EXW: 'EXW (מחצר הספק)', FOB: 'FOB (עד הנמל בחו"ל)', CIF: 'CIF (כולל הובלה וביטוח)', DDP: 'DDP (עד הדלת)', other: 'אחר' }
-const QUOTE_STATUS = { draft: 'טיוטה', sent: 'נשלחה', accepted: 'התקבלה', rejected: 'נדחתה' }
+export const QUOTE_STATUS = { draft: 'טיוטה', sent: 'נשלחה', accepted: 'התקבלה', rejected: 'נדחתה' }
+
+// Effective quantity of a quote item: cartons × kg-per-carton when both set, otherwise manual quantity.
+export const effQty = (it) => {
+  const kg = Number(it.kg_per_carton) || 0
+  const ct = Number(it.cartons) || 0
+  return kg > 0 && ct > 0 ? kg * ct : Number(it.quantity) || 0
+}
 
 // Total cost per unit in ILS, using live rates (falls back to the saved snapshot rate).
 export const costPerUnitILS = (q, rates) =>
@@ -97,33 +104,7 @@ function CalculatorTab() {
               <button className="ghost small" type="button" onClick={() => refresh()}>↺ רענון שערים</button></>
           : <>⚠ שערי מטבע לא זמינים כרגע (אין אינטרנט?) — מוצגים שערים אחרונים שנשמרו</>}
       </div>
-      <input placeholder="חיפוש מהיר: מוצר, ספק, מדינה…" value={q} onChange={(e) => setQ(e.target.value)} style={{ marginBottom: 12 }} />
-      {filtered.length === 0 && <div className="empty">אין מחירים עדיין — הוסף מחיר ראשון מספק</div>}
-      {filtered.map((r) => {
-        const disp = displayCurrency(r)
-        const costI = costPerUnitILS(r, rates)
-        const saleI = salePriceILS(r, rates)
-        return (
-          <div key={r.id} className="list-item">
-            <div className="grow">
-              <div className="title">{r.product_name}</div>
-              <div className="sub">
-                {[r.supplier_name, r.country, INCOTERMS[r.incoterm]?.split(' ')[0]].filter(Boolean).join(' · ')}
-                {' · '}מחיר ספק {fmtCur(Number(r.unit_cost), r.currency)}
-                {Number(r.freight_unit_cost) > 0 && ` + הובלה ${fmtCur(Number(r.freight_unit_cost), r.freight_currency || 'ILS')}`}
-                {Number(r.extra_unit_cost) > 0 && ` + נוספות ${fmtCur(Number(r.extra_unit_cost), r.extra_currency || 'ILS')}`}
-                {' · '}{fmtDate(r.quote_date)}
-              </div>
-              <div className="sub num">
-                עלות: <b>{fmtCur(fromILS(costI, disp, rates), disp)}</b> / {r.unit} · רווח {Number(r.margin_pct)}% ←{' '}
-                <b style={{ color: 'var(--good-text)', fontSize: '1.05em' }}>מכירה: {fmtCur(fromILS(saleI, disp, rates), disp)} / {r.unit}</b>
-                {disp !== 'ILS' && <span className="muted"> ({fmtMoney(saleI)})</span>}
-              </div>
-            </div>
-            <button className="ghost small" onClick={() => setEditing(r)}>עריכה</button>
-          </div>
-        )
-      })}
+      <PriceTable rows={filtered} rates={rates} q={q} setQ={setQ} onEdit={setEditing} />
       {editing && (
         <QuoteCalcForm
           initial={editing.id ? editing : null}
@@ -134,6 +115,100 @@ function CalculatorTab() {
         />
       )}
     </div>
+  )
+}
+
+// Excel-like price table: column filters + click-to-sort.
+function PriceTable({ rows, rates, q, setQ, onEdit }) {
+  const [country, setCountry] = useState('')
+  const [supplier, setSupplier] = useState('')
+  const [incoterm, setIncoterm] = useState('')
+  const [sort, setSort] = useState({ key: 'product_name', dir: 1 })
+
+  const countries = [...new Set(rows.map((r) => r.country).filter(Boolean))].sort()
+  const suppliers = [...new Set(rows.map((r) => r.supplier_name).filter(Boolean))].sort()
+
+  const enriched = useMemo(() => rows
+    .filter((r) => (!country || r.country === country) && (!supplier || r.supplier_name === supplier) && (!incoterm || r.incoterm === incoterm))
+    .map((r) => ({ ...r, _cost: costPerUnitILS(r, rates), _sale: salePriceILS(r, rates) })),
+  [rows, country, supplier, incoterm, rates])
+
+  const sorted = useMemo(() => {
+    const s = enriched.slice()
+    const { key, dir } = sort
+    s.sort((a, b) => {
+      const av = a[key], bv = b[key]
+      if (typeof av === 'number' && typeof bv === 'number') return (av - bv) * dir
+      return String(av ?? '').localeCompare(String(bv ?? ''), 'he') * dir
+    })
+    return s
+  }, [enriched, sort])
+
+  function th(key, label) {
+    const active = sort.key === key
+    return (
+      <th style={{ cursor: 'pointer', whiteSpace: 'nowrap' }} onClick={() => setSort({ key, dir: active ? -sort.dir : 1 })}>
+        {label}{active ? (sort.dir === 1 ? ' ▲' : ' ▼') : ''}
+      </th>
+    )
+  }
+
+  return (
+    <>
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
+        <input style={{ flex: '2 1 160px' }} placeholder="🔎 חיפוש מוצר…" value={q} onChange={(e) => setQ(e.target.value)} />
+        <select style={{ flex: '1 1 110px' }} value={supplier} onChange={(e) => setSupplier(e.target.value)}>
+          <option value="">כל הספקים</option>
+          {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
+        </select>
+        <select style={{ flex: '1 1 110px' }} value={country} onChange={(e) => setCountry(e.target.value)}>
+          <option value="">כל המדינות</option>
+          {countries.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+        <select style={{ flex: '1 1 100px' }} value={incoterm} onChange={(e) => setIncoterm(e.target.value)}>
+          <option value="">כל התנאים</option>
+          {Object.keys(INCOTERMS).map((k) => <option key={k} value={k}>{k}</option>)}
+        </select>
+      </div>
+      {sorted.length === 0 && <div className="empty">אין מחירים תואמים לסינון</div>}
+      {sorted.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <table>
+            <thead>
+              <tr>
+                {th('product_name', 'מוצר')}
+                {th('supplier_name', 'ספק')}
+                {th('country', 'מדינה')}
+                {th('incoterm', 'תנאי')}
+                {th('unit_cost', 'מחיר ספק')}
+                {th('_cost', 'עלות ₪')}
+                {th('margin_pct', '% רווח')}
+                {th('_sale', 'מכירה ₪')}
+                <th></th>
+              </tr>
+            </thead>
+            <tbody>
+              {sorted.map((r) => (
+                <tr key={r.id}>
+                  <td><b>{r.product_name}</b></td>
+                  <td>{r.supplier_name || <span className="muted">—</span>}</td>
+                  <td>{r.country || '—'}</td>
+                  <td>{r.incoterm}</td>
+                  <td className="num" dir="ltr">{fmtCur(Number(r.unit_cost), r.currency)}</td>
+                  <td className="num">{fmtMoney(r._cost)}</td>
+                  <td className="num">{Number(r.margin_pct)}%</td>
+                  <td className="num" style={{ color: 'var(--good-text)', fontWeight: 700 }}>{fmtMoney(r._sale)}</td>
+                  <td><button className="ghost small" onClick={() => onEdit(r)}>✎</button></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <div className="small-text muted" style={{ marginTop: 8 }}>
+        לחיצה על כותרת עמודה ממיינת · העלות והמכירה בשקלים לפי שער עדכני · {sorted.length} שורות
+      </div>
+    </>
   )
 }
 
@@ -372,15 +447,18 @@ function QuotesTab() {
   )
 }
 
-function QuoteForm({ initial, customers, priceBook, products, cps, rates, onClose, onSaved }) {
-  const [customerId, setCustomerId] = useState(initial?.customer_id || '')
-  const [customerName, setCustomerName] = useState(initial?.customer_name || '')
+export function QuoteForm({ initial, customers, priceBook, products, cps, rates, defaultCustomerId, onClose, onSaved }) {
+  const [customerId, setCustomerId] = useState(initial?.customer_id || defaultCustomerId || '')
+  const [customerName, setCustomerName] = useState(
+    initial?.customer_name || (customers || []).find((c) => c.id === defaultCustomerId)?.name || ''
+  )
   const [validUntil, setValidUntil] = useState(initial?.valid_until || defaultValidity())
   const [vatPct, setVatPct] = useState(initial?.vat_pct ?? 18)
   const [notes, setNotes] = useState(initial?.notes || '')
   const [items, setItems] = useState(
     initial ? (initial.quote_items || []).sort((a, b) => a.position - b.position).map((it) => ({
       description: it.description, unit: it.unit, quantity: it.quantity, unit_price: it.unit_price,
+      kg_per_carton: it.kg_per_carton ?? '', cartons: it.cartons ?? '',
     })) : []
   )
   const [err, setErr] = useState('')
@@ -412,22 +490,23 @@ function QuoteForm({ initial, customers, priceBook, products, cps, rates, onClos
   }
 
   function addItem(sug) {
-    if (sug) setItems([...items, { description: sug.label, unit: sug.unit || 'kg', quantity: 1, unit_price: sug.price }])
-    else setItems([...items, { description: '', unit: 'kg', quantity: 1, unit_price: '' }])
+    const base = { unit: 'kg', quantity: '', unit_price: '', kg_per_carton: '', cartons: '' }
+    if (sug) setItems([...items, { ...base, description: sug.label, unit: sug.unit || 'kg', unit_price: sug.price }])
+    else setItems([...items, { ...base, description: '' }])
   }
 
   function upd(i, k, v) {
     const n = items.slice(); n[i] = { ...n[i], [k]: v }; setItems(n)
   }
 
-  const subtotal = items.reduce((t, it) => t + (Number(it.quantity) || 0) * (Number(it.unit_price) || 0), 0)
+  const subtotal = items.reduce((t, it) => t + effQty(it) * (Number(it.unit_price) || 0), 0)
   const vat = subtotal * (Number(vatPct) / 100)
 
   async function save(e) {
     e.preventDefault(); setErr('')
     if (!customerName.trim()) return setErr('הזן שם לקוח')
-    const valid = items.filter((it) => it.description.trim() && Number(it.quantity) > 0)
-    if (!valid.length) return setErr('הוסף לפחות פריט אחד')
+    const valid = items.filter((it) => it.description.trim() && effQty(it) > 0)
+    if (!valid.length) return setErr('הוסף לפחות פריט אחד עם כמות (ק"ג או קרטונים)')
     setBusy(true)
     const row = {
       customer_id: customerId || null,
@@ -448,7 +527,9 @@ function QuoteForm({ initial, customers, priceBook, products, cps, rates, onClos
     }
     const res2 = await supabase.from('quote_items').insert(valid.map((it, i) => ({
       quote_id: quoteId, position: i, description: it.description.trim(),
-      unit: it.unit, quantity: Number(it.quantity), unit_price: Number(it.unit_price) || 0,
+      unit: it.unit, quantity: effQty(it), unit_price: Number(it.unit_price) || 0,
+      kg_per_carton: Number(it.kg_per_carton) > 0 ? Number(it.kg_per_carton) : null,
+      cartons: Number(it.cartons) > 0 ? Number(it.cartons) : null,
     })))
     if (res2.error) { setErr(res2.error.message); setBusy(false); return }
     setBusy(false)
@@ -486,17 +567,44 @@ function QuoteForm({ initial, customers, priceBook, products, cps, rates, onClos
             ))}
           </div>
         )}
-        {items.map((it, i) => (
-          <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-            <input style={{ flex: '3 1 150px' }} placeholder="תיאור המוצר" value={it.description} onChange={(e) => upd(i, 'description', e.target.value)} />
-            <input style={{ flex: '1 1 60px' }} type="number" step="0.01" min="0" placeholder="כמות" value={it.quantity} onChange={(e) => upd(i, 'quantity', e.target.value)} />
-            <select style={{ flex: '1 1 60px' }} value={it.unit} onChange={(e) => upd(i, 'unit', e.target.value)}>
-              <option value="kg">ק״ג</option><option value="unit">יח׳</option><option value="carton">קרטון</option>
-            </select>
-            <input style={{ flex: '1 1 80px' }} type="number" step="0.01" min="0" placeholder="מחיר ליח׳ ₪" value={it.unit_price} onChange={(e) => upd(i, 'unit_price', e.target.value)} />
-            <button type="button" className="ghost small" onClick={() => setItems(items.filter((_, j) => j !== i))}>✕</button>
-          </div>
-        ))}
+        {items.map((it, i) => {
+          const cartonMode = Number(it.kg_per_carton) > 0 && Number(it.cartons) > 0
+          const qty = effQty(it)
+          const lineTotal = qty * (Number(it.unit_price) || 0)
+          return (
+            <div key={i} className="card" style={{ background: 'var(--page)', padding: '10px 12px', marginBottom: 8 }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
+                <input style={{ flex: 1 }} placeholder="תיאור המוצר" value={it.description} onChange={(e) => upd(i, 'description', e.target.value)} />
+                <button type="button" className="ghost small" onClick={() => setItems(items.filter((_, j) => j !== i))}>✕</button>
+              </div>
+              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+                <div style={{ flex: '1 1 90px' }}>
+                  <label style={{ margin: '0 0 2px' }}>מחיר לק״ג (₪)</label>
+                  <input type="number" step="0.01" min="0" value={it.unit_price} onChange={(e) => upd(i, 'unit_price', e.target.value)} />
+                </div>
+                <div style={{ flex: '1 1 90px' }}>
+                  <label style={{ margin: '0 0 2px' }}>ק״ג בקרטון</label>
+                  <input type="number" step="0.01" min="0" placeholder="—" value={it.kg_per_carton} onChange={(e) => upd(i, 'kg_per_carton', e.target.value)} />
+                </div>
+                <div style={{ flex: '1 1 80px' }}>
+                  <label style={{ margin: '0 0 2px' }}>קרטונים</label>
+                  <input type="number" step="1" min="0" placeholder="—" value={it.cartons} onChange={(e) => upd(i, 'cartons', e.target.value)} />
+                </div>
+                <div style={{ flex: '1 1 90px' }}>
+                  <label style={{ margin: '0 0 2px' }}>סה״כ ק״ג</label>
+                  <input type="number" step="0.01" min="0" value={cartonMode ? qty : it.quantity} disabled={cartonMode}
+                    onChange={(e) => upd(i, 'quantity', e.target.value)} />
+                </div>
+              </div>
+              {qty > 0 && (
+                <div className="small-text num" style={{ marginTop: 6 }}>
+                  {cartonMode && <>{Number(it.cartons)} קרטונים × {Number(it.kg_per_carton)} ק״ג = {qty.toLocaleString('he-IL')} ק״ג · </>}
+                  סה״כ שורה: <b>{fmtMoney(lineTotal)}</b>
+                </div>
+              )}
+            </div>
+          )
+        })}
 
         {items.length > 0 && (
           <div className="card" style={{ background: 'var(--page)' }}>
@@ -593,13 +701,19 @@ export function printQuote(quote) {
   <table>
     <thead><tr><th style="width:44%">מוצר</th><th>כמות</th><th>יחידה</th><th>מחיר ליחידה</th><th>סה״כ</th></tr></thead>
     <tbody>
-      ${items.map((it) => `<tr>
+      ${items.map((it) => {
+        const carton = Number(it.cartons) > 0 && Number(it.kg_per_carton) > 0
+        const qtyCell = carton
+          ? `${Number(it.cartons).toLocaleString('he-IL')} קרטונים × ${Number(it.kg_per_carton).toLocaleString('he-IL')} ק״ג = ${Number(it.quantity).toLocaleString('he-IL')} ק״ג`
+          : Number(it.quantity).toLocaleString('he-IL')
+        return `<tr>
         <td>${esc(it.description)}</td>
-        <td class="num">${Number(it.quantity).toLocaleString('he-IL')}</td>
+        <td class="num">${qtyCell}</td>
         <td>${unitLabel[it.unit] || esc(it.unit)}</td>
         <td class="num">${nis(Number(it.unit_price))}</td>
         <td class="num">${nis(Number(it.quantity) * Number(it.unit_price))}</td>
-      </tr>`).join('')}
+      </tr>`
+      }).join('')}
     </tbody>
   </table>
   <div class="totals num">
@@ -609,7 +723,7 @@ export function printQuote(quote) {
   </div>
   ${quote.notes ? `<div class="notes"><div class="lbl">הערות ותנאים</div>${esc(quote.notes)}</div>` : ''}
   <footer>
-    <span>Agrix Trade · ייבוא פיצוחים ומזון</span>
+    <span></span>
     <span>הצעה מס׳ ${quote.quote_number} · ${dateStr}</span>
   </footer>
 </div>

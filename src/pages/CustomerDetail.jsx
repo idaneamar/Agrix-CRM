@@ -8,6 +8,8 @@ import Modal from '../components/Modal.jsx'
 import { CustomerForm } from './Customers.jsx'
 import OrderForm from '../components/OrderForm.jsx'
 import { waLink, wazeLink } from '../logic.js'
+import { QuoteForm, printQuote, QUOTE_STATUS } from './PriceBook.jsx'
+import { useRates } from '../rates.js'
 
 export default function CustomerDetail() {
   const { id } = useParams()
@@ -37,7 +39,7 @@ export default function CustomerDetail() {
       </div>
 
       <div className="tabs">
-        {[['info', 'פרטים'], ['prices', 'מוצרים ומחירים'], ['calls', 'שיחות'], ['orders', 'משלוחים'], ['files', 'מסמכים']].map(([k, v]) => (
+        {[['info', 'פרטים'], ['prices', 'מוצרים ומחירים'], ['calls', 'שיחות'], ['orders', 'משלוחים'], ['quotes', 'הצעות מחיר'], ['files', 'מסמכים']].map(([k, v]) => (
           <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>{v}</button>
         ))}
       </div>
@@ -46,6 +48,7 @@ export default function CustomerDetail() {
       {tab === 'prices' && <PricesTab customerId={id} />}
       {tab === 'calls' && <CallsTab customerId={id} />}
       {tab === 'orders' && <OrdersTab customerId={id} />}
+      {tab === 'quotes' && <CustomerQuotesTab customer={customer} />}
       {tab === 'files' && <FilesTab customerId={id} />}
 
       {editing && (
@@ -335,6 +338,73 @@ function OrdersTab({ customerId }) {
       })}
       {adding && (
         <OrderForm customerId={customerId} onClose={() => setAdding(false)} onSaved={() => { setAdding(false); load() }} />
+      )}
+    </div>
+  )
+}
+
+function CustomerQuotesTab({ customer }) {
+  const [quotes, setQuotes] = useState([])
+  const [aux, setAux] = useState(null)
+  const [editing, setEditing] = useState(null)
+  const { rates } = useRates()
+
+  async function load() {
+    const [qs, p, pb, cp] = await Promise.all([
+      supabase.from('quotes').select('*, quote_items(*)').eq('customer_id', customer.id).order('created_at', { ascending: false }),
+      supabase.from('products').select('*').eq('active', true),
+      supabase.from('supplier_quotes').select('*'),
+      supabase.from('customer_products').select('*').eq('customer_id', customer.id),
+    ])
+    setQuotes(qs.data || [])
+    setAux({ products: p.data || [], priceBook: pb.data || [], cps: cp.data || [] })
+  }
+  useEffect(() => { load() }, [customer.id])
+
+  async function setStatus(quote, status) {
+    await supabase.from('quotes').update({ status }).eq('id', quote.id)
+    load()
+  }
+
+  return (
+    <div className="card">
+      <div className="section-head">
+        <h2>הצעות מחיר ללקוח</h2>
+        <button className="small" onClick={() => setEditing({})} disabled={!aux}>+ הצעת מחיר</button>
+      </div>
+      {quotes.length === 0 && <div className="empty">אין הצעות מחיר ללקוח זה</div>}
+      {quotes.map((quote) => {
+        const subtotal = (quote.quote_items || []).reduce((t, it) => t + Number(it.quantity) * Number(it.unit_price), 0)
+        const total = subtotal * (1 + Number(quote.vat_pct) / 100)
+        return (
+          <div key={quote.id} className="list-item">
+            <div className="grow">
+              <div className="title">#{quote.quote_number} · {fmtDate(quote.created_at)}</div>
+              <div className="sub num">
+                {(quote.quote_items || []).length} פריטים · סה״כ כולל מע״מ: <b>{fmtMoney(total)}</b>
+              </div>
+            </div>
+            <span className={`badge ${quote.status === 'accepted' ? 'delivered' : quote.status === 'rejected' ? 'canceled' : 'planned'}`}>
+              {QUOTE_STATUS[quote.status]}
+            </span>
+            <button className="ghost small" onClick={() => printQuote(quote)}>🖨</button>
+            <button className="ghost small" onClick={() => setEditing(quote)}>עריכה</button>
+            {quote.status === 'draft' && <button className="ghost small" onClick={() => setStatus(quote, 'sent')}>נשלחה ✓</button>}
+          </div>
+        )
+      })}
+      {editing && aux && (
+        <QuoteForm
+          initial={editing.id ? editing : null}
+          customers={[{ id: customer.id, name: customer.name }]}
+          defaultCustomerId={customer.id}
+          priceBook={aux.priceBook}
+          products={aux.products}
+          cps={aux.cps}
+          rates={rates}
+          onClose={() => setEditing(null)}
+          onSaved={() => { setEditing(null); load() }}
+        />
       )}
     </div>
   )
