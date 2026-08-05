@@ -364,6 +364,12 @@ function QuotesTab() {
     load()
   }
 
+  async function deleteQuote(quote) {
+    if (!window.confirm(`למחוק את הצעה #${quote.quote_number}?`)) return
+    await supabase.from('quotes').delete().eq('id', quote.id)
+    load()
+  }
+
   const [converted, setConverted] = useState(null)
 
   // One-click: quote -> planned order. Items match products by name; unmatched become description lines.
@@ -428,6 +434,7 @@ function QuotesTab() {
             {(quote.status === 'sent' || quote.status === 'accepted') && (
               <button className="ghost small" onClick={() => toOrder(quote)}>🚚 ← הזמנה</button>
             )}
+            <button className="ghost small danger" onClick={() => deleteQuote(quote)}>🗑</button>
           </div>
         )
       })}

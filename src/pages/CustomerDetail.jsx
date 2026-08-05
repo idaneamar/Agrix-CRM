@@ -366,6 +366,12 @@ function CustomerQuotesTab({ customer }) {
     load()
   }
 
+  async function deleteQuote(quote) {
+    if (!window.confirm(`למחוק את הצעה #${quote.quote_number}?`)) return
+    await supabase.from('quotes').delete().eq('id', quote.id)
+    load()
+  }
+
   return (
     <div className="card">
       <div className="section-head">
@@ -390,6 +396,7 @@ function CustomerQuotesTab({ customer }) {
             <button className="ghost small" onClick={() => printQuote(quote)}>🖨</button>
             <button className="ghost small" onClick={() => setEditing(quote)}>עריכה</button>
             {quote.status === 'draft' && <button className="ghost small" onClick={() => setStatus(quote, 'sent')}>נשלחה ✓</button>}
+            <button className="ghost small danger" onClick={() => deleteQuote(quote)}>🗑</button>
           </div>
         )
       })}
