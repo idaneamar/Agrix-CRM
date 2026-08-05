@@ -9,6 +9,7 @@ import Orders from './pages/Orders.jsx'
 import ImportPage from './pages/Import.jsx'
 import Finance from './pages/Finance.jsx'
 import PriceBook from './pages/PriceBook.jsx'
+import Suppliers from './pages/Suppliers.jsx'
 import Settings from './pages/Settings.jsx'
 
 const NAV = [
@@ -16,6 +17,7 @@ const NAV = [
   ['/customers', '👥', 'לקוחות', false],
   ['/orders', '🚚', 'משלוחים', false],
   ['/import', '📦', 'ייבוא', false],
+  ['/suppliers', '🤝', 'ספקים', false],
   ['/prices', '🏷️', 'מחירון', false],
   ['/finance', '💰', 'כספים', false],
   ['/settings', '⚙️', 'הגדרות', false],
@@ -66,6 +68,7 @@ export default function App() {
               <Route path="/customers/:id" element={<CustomerDetail />} />
               <Route path="/orders" element={<Orders />} />
               <Route path="/import" element={<ImportPage />} />
+              <Route path="/suppliers" element={<Suppliers />} />
               <Route path="/finance" element={<Finance />} />
               <Route path="/prices" element={<PriceBook />} />
               <Route path="/settings" element={<Settings />} />

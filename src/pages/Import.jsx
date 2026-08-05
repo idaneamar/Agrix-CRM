@@ -9,13 +9,12 @@ export default function ImportPage() {
     <div>
       <h1>ייבוא ומלאי</h1>
       <div className="tabs">
-        {[['stock', 'מלאי'], ['shipments', 'משלוחי ייבוא'], ['suppliers', 'ספקים']].map(([k, v]) => (
+        {[['stock', 'מלאי'], ['shipments', 'משלוחי ייבוא']].map(([k, v]) => (
           <button key={k} className={tab === k ? 'active' : ''} onClick={() => setTab(k)}>{v}</button>
         ))}
       </div>
       {tab === 'stock' && <StockTab />}
       {tab === 'shipments' && <ShipmentsTab />}
-      {tab === 'suppliers' && <SuppliersTab />}
     </div>
   )
 }
@@ -420,7 +419,7 @@ function ShipmentDocs({ shipment, onClose }) {
 
 /* ---------- Suppliers ---------- */
 
-function SuppliersTab() {
+export function SuppliersTab() {
   const [suppliers, setSuppliers] = useState([])
   const [editing, setEditing] = useState(null)
 
