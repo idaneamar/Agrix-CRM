@@ -69,21 +69,45 @@ h3 { font-size: 1rem; }
 .topbar .spacer { flex: 1; }
 .topbar button { background: rgba(255,255,255,0.15); color: #fff; border: none; }
 
-.main { flex: 1; padding: 16px; max-width: 1080px; width: 100%; margin: 0 auto; padding-bottom: 90px; }
+.layout { display: flex; flex: 1; align-items: stretch; }
+.main { flex: 1; min-width: 0; padding: 16px; max-width: 1080px; width: 100%; margin: 0 auto; padding-bottom: 40px; }
 
-.bottomnav {
-  position: fixed; bottom: 0; right: 0; left: 0; z-index: 20;
-  display: flex; justify-content: space-around;
-  background: var(--surface); border-top: 1px solid var(--border);
-  padding: 6px 0 calc(6px + env(safe-area-inset-bottom));
+/* Side navigation — on the right (RTL start side) */
+.sidenav {
+  width: 190px; flex-shrink: 0;
+  background: var(--surface); border-inline-end: 1px solid var(--border);
+  padding: 14px 10px;
+  position: sticky; top: 52px;
+  height: calc(100vh - 52px);
+  overflow-y: auto;
 }
-.bottomnav a {
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  color: var(--muted); font-size: 0.68rem; padding: 4px 4px; border-radius: 8px;
-  min-width: 0; flex: 1; text-align: center; white-space: nowrap;
+.sidenav a {
+  display: flex; align-items: center; gap: 10px;
+  color: var(--ink-2); font-size: 0.95rem; font-weight: 500;
+  padding: 10px 12px; border-radius: 10px; margin-bottom: 4px;
 }
-.bottomnav a.active { color: var(--brand); font-weight: 600; }
-.bottomnav .icon { font-size: 1.25rem; line-height: 1; }
+.sidenav a.active { background: var(--page); color: var(--brand); font-weight: 700; }
+.sidenav .icon { font-size: 1.15rem; line-height: 1; }
+
+.hamburger { display: none; background: rgba(255,255,255,0.15); font-size: 1.15rem; padding: 4px 12px; }
+.nav-overlay { display: none; }
+
+@media (max-width: 768px) {
+  .hamburger { display: inline-flex; }
+  .sidenav {
+    position: fixed; top: 0; bottom: 0; right: 0; z-index: 60;
+    height: 100vh; width: 230px;
+    padding-top: calc(20px + env(safe-area-inset-top));
+    transform: translateX(100%);
+    transition: transform 0.22s ease;
+    box-shadow: -8px 0 30px rgba(0,0,0,0.18);
+  }
+  .sidenav.open { transform: none; }
+  .nav-overlay {
+    display: block; position: fixed; inset: 0; z-index: 50;
+    background: rgba(0,0,0,0.4);
+  }
+}
 
 .card {
   background: var(--surface); border: 1px solid var(--border);

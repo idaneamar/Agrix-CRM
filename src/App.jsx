@@ -11,8 +11,19 @@ import Finance from './pages/Finance.jsx'
 import PriceBook from './pages/PriceBook.jsx'
 import Settings from './pages/Settings.jsx'
 
+const NAV = [
+  ['/', '📊', 'ראשי', true],
+  ['/customers', '👥', 'לקוחות', false],
+  ['/orders', '🚚', 'משלוחים', false],
+  ['/import', '📦', 'ייבוא', false],
+  ['/prices', '🏷️', 'מחירון', false],
+  ['/finance', '💰', 'כספים', false],
+  ['/settings', '⚙️', 'הגדרות', false],
+]
+
 export default function App() {
   const [session, setSession] = useState(undefined)
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setSession(data.session))
@@ -27,46 +38,41 @@ export default function App() {
     <HashRouter>
       <div className="app">
         <header className="topbar">
+          <button className="hamburger" aria-label="תפריט" onClick={() => setMenuOpen(!menuOpen)}>☰</button>
           <span className="logo">Agrix CRM</span>
           <span className="spacer" />
           <button className="small" onClick={() => supabase.auth.signOut()}>יציאה</button>
         </header>
-        <main className="main">
-          <Routes>
-            <Route path="/" element={<Dashboard />} />
-            <Route path="/customers" element={<Customers />} />
-            <Route path="/customers/:id" element={<CustomerDetail />} />
-            <Route path="/orders" element={<Orders />} />
-            <Route path="/import" element={<ImportPage />} />
-            <Route path="/finance" element={<Finance />} />
-            <Route path="/prices" element={<PriceBook />} />
-            <Route path="/settings" element={<Settings />} />
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
-        </main>
-        <nav className="bottomnav">
-          <NavLink to="/" end className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="icon">📊</span>ראשי
-          </NavLink>
-          <NavLink to="/customers" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="icon">👥</span>לקוחות
-          </NavLink>
-          <NavLink to="/orders" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="icon">🚚</span>משלוחים
-          </NavLink>
-          <NavLink to="/import" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="icon">📦</span>ייבוא
-          </NavLink>
-          <NavLink to="/prices" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="icon">🏷️</span>מחירון
-          </NavLink>
-          <NavLink to="/finance" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="icon">💰</span>כספים
-          </NavLink>
-          <NavLink to="/settings" className={({ isActive }) => (isActive ? 'active' : '')}>
-            <span className="icon">⚙️</span>הגדרות
-          </NavLink>
-        </nav>
+        <div className="layout">
+          <nav className={`sidenav${menuOpen ? ' open' : ''}`}>
+            {NAV.map(([to, icon, label, end]) => (
+              <NavLink
+                key={to}
+                to={to}
+                end={end}
+                className={({ isActive }) => (isActive ? 'active' : '')}
+                onClick={() => setMenuOpen(false)}
+              >
+                <span className="icon">{icon}</span>
+                <span>{label}</span>
+              </NavLink>
+            ))}
+          </nav>
+          {menuOpen && <div className="nav-overlay" onClick={() => setMenuOpen(false)} />}
+          <main className="main">
+            <Routes>
+              <Route path="/" element={<Dashboard />} />
+              <Route path="/customers" element={<Customers />} />
+              <Route path="/customers/:id" element={<CustomerDetail />} />
+              <Route path="/orders" element={<Orders />} />
+              <Route path="/import" element={<ImportPage />} />
+              <Route path="/finance" element={<Finance />} />
+              <Route path="/prices" element={<PriceBook />} />
+              <Route path="/settings" element={<Settings />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </main>
+        </div>
       </div>
     </HashRouter>
   )
