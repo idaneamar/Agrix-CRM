@@ -129,7 +129,10 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
   const suppliers = [...new Set(rows.map((r) => r.supplier_name).filter(Boolean))].sort()
 
   const enriched = useMemo(() => rows
-    .filter((r) => (!country || r.country === country) && (!supplier || r.supplier_name === supplier) && (!incoterm || r.incoterm === incoterm))
+    .filter((r) =>
+      (!country || (r.country || '').toLowerCase().includes(country.toLowerCase())) &&
+      (!supplier || (r.supplier_name || '').toLowerCase().includes(supplier.toLowerCase())) &&
+      (!incoterm || r.incoterm === incoterm))
     .map((r) => ({ ...r, _cost: costPerUnitILS(r, rates), _sale: salePriceILS(r, rates) })),
   [rows, country, supplier, incoterm, rates])
 
@@ -157,14 +160,38 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
     <>
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 10 }}>
         <input style={{ flex: '2 1 160px' }} placeholder="🔎 חיפוש מוצר…" value={q} onChange={(e) => setQ(e.target.value)} />
-        <select style={{ flex: '1 1 110px' }} value={supplier} onChange={(e) => setSupplier(e.target.value)}>
-          <option value="">כל הספקים</option>
-          {suppliers.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select style={{ flex: '1 1 110px' }} value={country} onChange={(e) => setCountry(e.target.value)}>
-          <option value="">כל המדינות</option>
-          {countries.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
+        <div style={{ flex: '1 1 110px', position: 'relative' }}>
+          <input
+            style={{ width: '100%' }}
+            list="supplier-filter-options"
+            placeholder="כל הספקים"
+            value={supplier}
+            onChange={(e) => setSupplier(e.target.value)}
+          />
+          {supplier && (
+            <button type="button" className="ghost small" title="נקה" onClick={() => setSupplier('')}
+              style={{ position: 'absolute', insetInlineEnd: 4, top: '50%', transform: 'translateY(-50%)', padding: '0 6px' }}>✕</button>
+          )}
+          <datalist id="supplier-filter-options">
+            {suppliers.map((s) => <option key={s} value={s} />)}
+          </datalist>
+        </div>
+        <div style={{ flex: '1 1 110px', position: 'relative' }}>
+          <input
+            style={{ width: '100%' }}
+            list="country-filter-options"
+            placeholder="כל המדינות"
+            value={country}
+            onChange={(e) => setCountry(e.target.value)}
+          />
+          {country && (
+            <button type="button" className="ghost small" title="נקה" onClick={() => setCountry('')}
+              style={{ position: 'absolute', insetInlineEnd: 4, top: '50%', transform: 'translateY(-50%)', padding: '0 6px' }}>✕</button>
+          )}
+          <datalist id="country-filter-options">
+            {countries.map((c) => <option key={c} value={c} />)}
+          </datalist>
+        </div>
         <select style={{ flex: '1 1 100px' }} value={incoterm} onChange={(e) => setIncoterm(e.target.value)}>
           <option value="">כל התנאים</option>
           {Object.keys(INCOTERMS).map((k) => <option key={k} value={k}>{k}</option>)}
