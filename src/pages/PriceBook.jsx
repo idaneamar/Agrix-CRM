@@ -136,7 +136,7 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
       (!incoterm || r.incoterm === incoterm))
     .map((r) => {
       const otherCostILS = toILS(r.freight_unit_cost, r.freight_currency || 'ILS', rates) + toILS(r.extra_unit_cost, r.extra_currency || 'ILS', rates)
-      const missingCosts = !Number(r.freight_unit_cost) || !Number(r.extra_unit_cost)
+      const missingCosts = !Number(r.freight_unit_cost)
       return { ...r, _cost: costPerUnitILS(r, rates), _sale: salePriceILS(r, rates), _other: otherCostILS, _missing: missingCosts }
     }),
   [rows, country, supplier, incoterm, rates])
@@ -236,7 +236,7 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
                   <td className="num" dir="ltr">{fmtCur(Number(r.unit_cost), r.currency)}</td>
                   <td className="num" dir="ltr">
                     {fmtCur(fromILS(r._other, disp, rates), disp)}
-                    {r._missing && <span title="הובלה ו/או עלויות נוספות לא הוזנו" style={{ marginInlineStart: 4 }}>⚠️</span>}
+                    {r._missing && <span title="עלות הובלה לא הוזנה" style={{ marginInlineStart: 4 }}>⚠️</span>}
                   </td>
                   <td className="num" dir="ltr">{fmtCur(fromILS(r._cost, disp, rates), disp)}</td>
                   <td className="num">{Number(r.margin_pct)}%</td>
@@ -249,7 +249,7 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
         </div>
       )}
       <div className="small-text muted" style={{ marginTop: 8 }}>
-        לחיצה על כותרת עמודה ממיינת · העלות והמכירה מוצגות ב-{disp} לפי שער עדכני · ⚠️ = הובלה ו/או עלויות נוספות לא הוזנו · {sorted.length} שורות
+        לחיצה על כותרת עמודה ממיינת · העלות והמכירה מוצגות ב-{disp} לפי שער עדכני · ⚠️ = עלות הובלה לא הוזנה · {sorted.length} שורות
       </div>
     </>
   )
