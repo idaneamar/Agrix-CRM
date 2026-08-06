@@ -327,6 +327,11 @@ function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
             מחיר מכירה מומלץ: <b>{fmtCur(fromILS(saleI, disp, rates), disp)}</b>{disp !== 'ILS' && <span className="muted"> ({fmtMoney(saleI)})</span>}
           </div>
           <div className="small-text muted">מחושב לפי שער עדכני — המחיר יתעדכן אוטומטית עם השער</div>
+          {(Number(f.freight_unit_cost) === 0 || Number(f.extra_unit_cost) === 0) && (
+            <div className="small-text" style={{ marginTop: 8, color: '#ff9500' }}>
+              ⚠️ {!Number(f.freight_unit_cost) && !Number(f.extra_unit_cost) ? 'עלויות הובלה ועלויות נוספות לא הוזנו' : !Number(f.freight_unit_cost) ? 'עלויות הובלה לא הוזנו' : 'עלויות נוספות לא הוזנו'}
+            </div>
+          )}
         </div>
 
         {err && <div className="error">{err}</div>}
