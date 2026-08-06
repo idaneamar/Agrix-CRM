@@ -100,7 +100,10 @@ export default function SupplierDetail() {
               <tbody>
                 {quotes.map((q) => (
                   <tr key={q.id}>
-                    <td><Link to={`/prices/${q.id}`} style={{ fontWeight: 700 }}>{q.product_name}</Link></td>
+                    <td>
+                      <Link to={`/prices/${q.id}`} style={{ fontWeight: 700 }}>{q.product_name}</Link>
+                      {q.variant_name && <div className="small-text muted">{q.variant_name}</div>}
+                    </td>
                     <td>{q.country || '—'}</td>
                     <td>{q.incoterm}</td>
                     <td className="num" dir="ltr">{Number(q.unit_cost).toLocaleString('he-IL')} {q.currency}</td>

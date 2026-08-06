@@ -83,7 +83,7 @@ function CalculatorTab() {
   useEffect(() => { load() }, [])
 
   const filtered = rows.filter((r) =>
-    [r.product_name, r.supplier_name, r.country].join(' ').toLowerCase().includes(q.toLowerCase())
+    [r.product_name, r.variant_name, r.supplier_name, r.country].join(' ').toLowerCase().includes(q.toLowerCase())
   )
 
   return (
@@ -93,8 +93,8 @@ function CalculatorTab() {
         <div style={{ display: 'flex', gap: 8 }}>
           <button className="ghost small" onClick={() =>
             downloadCsv('מחירון.csv',
-              ['מוצר', 'ספק', 'מדינה', 'תנאי', 'מחיר ספק', 'מטבע', 'הובלה ליח׳', 'מטבע הובלה', 'נוספות ליח׳', 'מטבע נוספות', 'עלות ₪', '% רווח', 'מחיר מכירה ₪'],
-              filtered.map((r) => [r.product_name, r.supplier_name || '', r.country || '', r.incoterm, r.unit_cost, r.currency, r.freight_unit_cost, r.freight_currency || 'ILS', r.extra_unit_cost, r.extra_currency || 'ILS', costPerUnitILS(r, rates).toFixed(2), r.margin_pct, salePriceILS(r, rates).toFixed(2)]))
+              ['מוצר', 'תת-מוצר', 'ספק', 'מדינה', 'תנאי', 'מחיר ספק', 'מטבע', 'הובלה ליח׳', 'מטבע הובלה', 'נוספות ליח׳', 'מטבע נוספות', 'עלות ₪', '% רווח', 'מחיר מכירה ₪'],
+              filtered.map((r) => [r.product_name, r.variant_name || '', r.supplier_name || '', r.country || '', r.incoterm, r.unit_cost, r.currency, r.freight_unit_cost, r.freight_currency || 'ILS', r.extra_unit_cost, r.extra_currency || 'ILS', costPerUnitILS(r, rates).toFixed(2), r.margin_pct, salePriceILS(r, rates).toFixed(2)]))
           }>⬇ אקסל</button>
           <button className="small" onClick={() => setEditing({})}>+ מחיר ספק</button>
         </div>
@@ -230,7 +230,10 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
             <tbody>
               {sorted.map((r) => (
                 <tr key={r.id}>
-                  <td><Link to={`/prices/${r.id}`} style={{ fontWeight: 700 }}>{r.product_name}</Link></td>
+                  <td>
+                    <Link to={`/prices/${r.id}`} style={{ fontWeight: 700 }}>{r.product_name}</Link>
+                    {r.variant_name && <div className="small-text muted">{r.variant_name}</div>}
+                  </td>
                   <td>{r.supplier_name || <span className="muted">—</span>}</td>
                   <td>{r.country || '—'}</td>
                   <td>{r.incoterm}</td>
@@ -260,7 +263,7 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
 // `prefill` seeds a few fields on a brand-new row (e.g. supplier/country from a supplier card) without editing anything.
 export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onSaved }) {
   const [f, setF] = useState(initial || {
-    product_name: '', supplier_id: '', supplier_name: '', country: '', incoterm: 'FOB',
+    product_name: '', variant_name: '', supplier_id: '', supplier_name: '', country: '', incoterm: 'FOB',
     unit: 'kg', unit_cost: '', currency: 'USD', freight_unit_cost: 0, freight_currency: 'ILS',
     extra_unit_cost: 0, extra_currency: 'ILS', margin_pct: 30,
     packaging_type: '', package_weight_kg: '',
@@ -292,6 +295,7 @@ export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onS
     const snap = f.currency === 'ILS' ? 1 : (rates?.[f.currency] ? 1 / rates[f.currency] : Number(initial?.fx_rate) || 1)
     const row = {
       product_name: f.product_name,
+      variant_name: f.variant_name || null,
       supplier_id: f.supplier_id || null,
       supplier_name: f.supplier_name || null,
       country: f.country || null,
@@ -346,8 +350,10 @@ export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onS
   return (
     <Modal title={initial ? 'עריכת מחיר ספק' : 'מחיר ספק חדש'} onClose={onClose}>
       <form onSubmit={save}>
-        <label>שם המוצר *</label>
-        <input value={f.product_name} onChange={set('product_name')} required placeholder="למשל: קשיו W320" />
+        <div className="formrow">
+          <div><label>שם המוצר (אב) *</label><input value={f.product_name} onChange={set('product_name')} required placeholder="למשל: מקדמיה, קפה" /></div>
+          <div><label>תת-מוצר / זן</label><input value={f.variant_name || ''} onChange={set('variant_name')} placeholder="למשל: סטייל 0, Arabica" /></div>
+        </div>
         <div className="formrow">
           <div>
             <label>ספק קיים</label>
@@ -559,7 +565,8 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
       list.push({ label: p.name, unit: p.unit, price: agreed?.agreed_price ?? p.default_price ?? '' })
     })
     priceBook.forEach((r) => {
-      list.push({ label: `${r.product_name}${r.country ? ` (${r.country})` : ''}`, unit: r.unit, price: Math.round(salePriceILS(r, rates) * 100) / 100 })
+      const name = r.variant_name ? `${r.product_name} - ${r.variant_name}` : r.product_name
+      list.push({ label: `${name}${r.country ? ` (${r.country})` : ''}`, unit: r.unit, price: Math.round(salePriceILS(r, rates) * 100) / 100 })
     })
     return list
   }, [products, priceBook, cps, customerId, rates])

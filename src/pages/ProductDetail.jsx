@@ -48,7 +48,7 @@ export default function ProductDetail() {
     <div>
       <div className="section-head">
         <div>
-          <h1>{row.product_name}</h1>
+          <h1>{row.product_name}{row.variant_name ? ` — ${row.variant_name}` : ''}</h1>
           <div className="muted small-text">
             {row.supplier_name || 'ללא ספק'} · {row.country || '—'} · {INCOTERMS[row.incoterm] || row.incoterm}
           </div>
@@ -63,7 +63,9 @@ export default function ProductDetail() {
         <h2>פרטי המוצר</h2>
         <table>
           <tbody>
-            <tr><th style={{ width: 160 }}>ספק</th><td>{row.supplier_name || '—'}</td></tr>
+            <tr><th style={{ width: 160 }}>שם מוצר (אב)</th><td>{row.product_name}</td></tr>
+            <tr><th>תת-מוצר / זן</th><td>{row.variant_name || <span className="muted">לא הוזן</span>}</td></tr>
+            <tr><th>ספק</th><td>{row.supplier_name || '—'}</td></tr>
             <tr><th>מדינה</th><td>{row.country || '—'}</td></tr>
             <tr><th>תנאי מכר</th><td>{INCOTERMS[row.incoterm] || row.incoterm}</td></tr>
             <tr><th>יחידת מחיר</th><td>{UNIT_LABEL[row.unit] || row.unit}</td></tr>
