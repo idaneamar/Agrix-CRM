@@ -578,14 +578,23 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
     if (c) setCustomerName(c.name)
   }
 
-  function addItem(sug) {
-    const base = { unit: 'kg', quantity: '', unit_price: '', kg_per_carton: '', cartons: '' }
-    if (sug) setItems([...items, { ...base, description: sug.label, unit: sug.unit || 'kg', unit_price: sug.price }])
-    else setItems([...items, { ...base, description: '' }])
+  function addItem() {
+    setItems([...items, { description: '', unit: 'kg', quantity: '', unit_price: '', kg_per_carton: '', cartons: '' }])
   }
 
   function upd(i, k, v) {
     const n = items.slice(); n[i] = { ...n[i], [k]: v }; setItems(n)
+  }
+
+  // Typing/picking a description that exactly matches a price-book suggestion
+  // auto-fills its unit and price — free text (no match) is left as-is.
+  function updDescription(i, v) {
+    const sug = suggestions.find((s) => s.label === v)
+    const n = items.slice()
+    n[i] = sug
+      ? { ...n[i], description: v, unit: sug.unit || n[i].unit, unit_price: sug.price !== '' && sug.price != null ? sug.price : n[i].unit_price }
+      : { ...n[i], description: v }
+    setItems(n)
   }
 
   const subtotal = items.reduce((t, it) => t + effQty(it) * (Number(it.unit_price) || 0), 0)
@@ -645,17 +654,11 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
 
         <div className="section-head" style={{ marginTop: 14 }}>
           <h3>פריטים</h3>
-          <button type="button" className="ghost small" onClick={() => addItem()}>+ שורה ריקה</button>
+          <button type="button" className="ghost small" onClick={addItem}>+ שורה ריקה</button>
         </div>
-        {suggestions.length > 0 && (
-          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
-            {suggestions.slice(0, 8).map((s, i) => (
-              <button key={i} type="button" className="ghost small" onClick={() => addItem(s)}>
-                + {s.label}{s.price !== '' && s.price != null ? ` (${fmtMoney(s.price)})` : ''}
-              </button>
-            ))}
-          </div>
-        )}
+        <datalist id="quote-item-suggestions">
+          {suggestions.map((s, i) => <option key={i} value={s.label} />)}
+        </datalist>
         {items.map((it, i) => {
           const cartonMode = Number(it.kg_per_carton) > 0 && Number(it.cartons) > 0
           const qty = effQty(it)
@@ -663,7 +666,13 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
           return (
             <div key={i} className="card" style={{ background: 'var(--page)', padding: '10px 12px', marginBottom: 8 }}>
               <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-                <input style={{ flex: 1 }} placeholder="תיאור המוצר" value={it.description} onChange={(e) => upd(i, 'description', e.target.value)} />
+                <input
+                  style={{ flex: 1 }}
+                  list="quote-item-suggestions"
+                  placeholder="בחר מוצר מהמחירון או הקלד חופשי…"
+                  value={it.description}
+                  onChange={(e) => updDescription(i, e.target.value)}
+                />
                 <button type="button" className="ghost small" onClick={() => setItems(items.filter((_, j) => j !== i))}>✕</button>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
