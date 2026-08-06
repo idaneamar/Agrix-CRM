@@ -219,6 +219,7 @@ function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
     extra_unit_cost: 0, extra_currency: 'ILS', margin_pct: 30,
     quote_date: new Date().toISOString().slice(0, 10), notes: '',
   })
+  const [displayCurr, setDisplayCurr] = useState('auto')
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
@@ -234,7 +235,8 @@ function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
     extra_unit_cost: Number(f.extra_unit_cost) || 0, extra_currency: f.extra_currency,
     margin_pct: Number(f.margin_pct) || 0,
   }
-  const disp = displayCurrency(preview)
+  const autoDisp = displayCurrency(preview)
+  const disp = displayCurr === 'auto' ? autoDisp : displayCurr
   const costI = costPerUnitILS(preview, rates)
   const saleI = salePriceILS(preview, rates)
 
@@ -312,6 +314,12 @@ function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
         <input type="number" step="0.1" min="0" value={f.margin_pct} onChange={set('margin_pct')} />
         <label>הערות</label>
         <input value={f.notes || ''} onChange={set('notes')} />
+
+        <label style={{ marginTop: 14 }}>הצג עלויות ומחיר מכירה ב-</label>
+        <select value={displayCurr} onChange={(e) => setDisplayCurr(e.target.value)}>
+          <option value="auto">אוטומטי (לפי המטבע בו מחושב)</option>
+          {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
 
         <div className="card" style={{ marginTop: 14, background: 'var(--page)' }}>
           <div className="num">עלות כוללת ליחידה: <b>{fmtCur(fromILS(costI, disp, rates), disp)}</b>{disp !== 'ILS' && <span className="muted"> ({fmtMoney(costI)})</span>}</div>
