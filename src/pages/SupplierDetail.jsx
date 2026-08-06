@@ -106,7 +106,11 @@ export default function SupplierDetail() {
                   <tr key={q.id}>
                     <td>
                       <Link to={`/prices/${q.id}`} style={{ fontWeight: 700 }}>{q.product_name}</Link>
-                      {q.variant_name && <div className="small-text muted">{q.variant_name}</div>}
+                      {(q.variant_name || q.product_code) && (
+                        <div className="small-text muted">
+                          {[q.variant_name, q.product_code ? `קוד ${q.product_code}` : null].filter(Boolean).join(' · ')}
+                        </div>
+                      )}
                     </td>
                     <td>{q.country || '—'}</td>
                     <td>{q.incoterm}</td>

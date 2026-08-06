@@ -232,7 +232,11 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
                 <tr key={r.id}>
                   <td>
                     <Link to={`/prices/${r.id}`} style={{ fontWeight: 700 }}>{r.product_name}</Link>
-                    {r.variant_name && <div className="small-text muted">{r.variant_name}</div>}
+                    {(r.variant_name || r.product_code) && (
+                      <div className="small-text muted">
+                        {[r.variant_name, r.product_code ? `קוד ${r.product_code}` : null].filter(Boolean).join(' · ')}
+                      </div>
+                    )}
                   </td>
                   <td>{r.supplier_name || <span className="muted">—</span>}</td>
                   <td>{r.country || '—'}</td>
@@ -263,7 +267,7 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
 // `prefill` seeds a few fields on a brand-new row (e.g. supplier/country from a supplier card) without editing anything.
 export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onSaved }) {
   const [f, setF] = useState(initial || {
-    product_name: '', variant_name: '', supplier_id: '', supplier_name: '', country: '', incoterm: 'FOB',
+    product_name: '', variant_name: '', product_code: '', supplier_id: '', supplier_name: '', country: '', incoterm: 'FOB',
     unit: 'kg', unit_cost: '', currency: 'USD', freight_unit_cost: 0, freight_currency: 'ILS',
     extra_unit_cost: 0, extra_currency: 'ILS', margin_pct: 30,
     packaging_type: '', package_weight_kg: '',
@@ -296,6 +300,7 @@ export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onS
     const row = {
       product_name: f.product_name,
       variant_name: f.variant_name || null,
+      product_code: f.product_code || null,
       supplier_id: f.supplier_id || null,
       supplier_name: f.supplier_name || null,
       country: f.country || null,
@@ -354,6 +359,8 @@ export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onS
           <div><label>שם המוצר (אב) *</label><input value={f.product_name} onChange={set('product_name')} required placeholder="למשל: מקדמיה, קפה" /></div>
           <div><label>תת-מוצר / זן</label><input value={f.variant_name || ''} onChange={set('variant_name')} placeholder="למשל: סטייל 0, Arabica" /></div>
         </div>
+        <label>קוד מוצר (SKU)</label>
+        <input value={f.product_code || ''} onChange={set('product_code')} placeholder="קוד פנימי לזיהוי המוצר, למשל: MC-001" />
         <div className="formrow">
           <div>
             <label>ספק קיים</label>
@@ -557,19 +564,25 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
     return d.toISOString().slice(0, 10)
   }
 
-  // Suggestions: products (with customer agreed price if exists) + price book entries (sale price)
-  const suggestions = useMemo(() => {
-    const list = []
-    products.forEach((p) => {
-      const agreed = customerId ? cps.find((x) => x.customer_id === customerId && x.product_id === p.id) : null
-      list.push({ label: p.name, unit: p.unit, price: agreed?.agreed_price ?? p.default_price ?? '' })
-    })
-    priceBook.forEach((r) => {
-      const name = r.variant_name ? `${r.product_name} - ${r.variant_name}` : r.product_name
-      list.push({ label: `${name}${r.country ? ` (${r.country})` : ''}`, unit: r.unit, price: Math.round(salePriceILS(r, rates) * 100) / 100 })
-    })
-    return list
-  }, [products, priceBook, cps, customerId, rates])
+  // Suggestions come ONLY from the current price book (supplier_quotes) — never the
+  // legacy general product catalog, so nothing that's no longer priced shows up here.
+  // searchLabel includes the product code + supplier so the same product from
+  // different suppliers can be told apart while searching; the clean `description`
+  // (no code/supplier) is what actually gets inserted into the quote line, since
+  // that text ends up printed on the customer-facing quote document.
+  const suggestions = useMemo(() => priceBook.map((r) => {
+    const name = r.variant_name ? `${r.product_name} - ${r.variant_name}` : r.product_name
+    const searchParts = [name]
+    if (r.product_code) searchParts.push(`קוד ${r.product_code}`)
+    searchParts.push(r.supplier_name || 'ללא ספק')
+    if (r.country) searchParts.push(r.country)
+    return {
+      searchLabel: searchParts.join(' · '),
+      description: `${name}${r.country ? ` (${r.country})` : ''}`,
+      unit: r.unit,
+      price: Math.round(salePriceILS(r, rates) * 100) / 100,
+    }
+  }), [priceBook, rates])
 
   function pickCustomer(e) {
     const id = e.target.value
@@ -586,13 +599,14 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
     const n = items.slice(); n[i] = { ...n[i], [k]: v }; setItems(n)
   }
 
-  // Typing/picking a description that exactly matches a price-book suggestion
-  // auto-fills its unit and price — free text (no match) is left as-is.
+  // Picking a suggestion (exact match on its searchLabel, which includes the
+  // product code + supplier for disambiguation) swaps in the clean description
+  // and auto-fills unit/price. Anything else (free typing, no match) is kept as-is.
   function updDescription(i, v) {
-    const sug = suggestions.find((s) => s.label === v)
+    const sug = suggestions.find((s) => s.searchLabel === v)
     const n = items.slice()
     n[i] = sug
-      ? { ...n[i], description: v, unit: sug.unit || n[i].unit, unit_price: sug.price !== '' && sug.price != null ? sug.price : n[i].unit_price }
+      ? { ...n[i], description: sug.description, unit: sug.unit || n[i].unit, unit_price: sug.price !== '' && sug.price != null ? sug.price : n[i].unit_price }
       : { ...n[i], description: v }
     setItems(n)
   }
@@ -657,7 +671,7 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
           <button type="button" className="ghost small" onClick={addItem}>+ שורה ריקה</button>
         </div>
         <datalist id="quote-item-suggestions">
-          {suggestions.map((s, i) => <option key={i} value={s.label} />)}
+          {suggestions.map((s, i) => <option key={i} value={s.searchLabel} />)}
         </datalist>
         {items.map((it, i) => {
           const cartonMode = Number(it.kg_per_carton) > 0 && Number(it.cartons) > 0
@@ -669,7 +683,7 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
                 <input
                   style={{ flex: 1 }}
                   list="quote-item-suggestions"
-                  placeholder="בחר מוצר מהמחירון או הקלד חופשי…"
+                  placeholder="הקלד לחיפוש מוצר, קוד או ספק — או הזן חופשי…"
                   value={it.description}
                   onChange={(e) => updDescription(i, e.target.value)}
                 />
