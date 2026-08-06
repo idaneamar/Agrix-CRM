@@ -124,6 +124,7 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
   const [supplier, setSupplier] = useState('')
   const [incoterm, setIncoterm] = useState('')
   const [sort, setSort] = useState({ key: 'product_name', dir: 1 })
+  const [disp, setDisp] = useState('ILS')
 
   const countries = [...new Set(rows.map((r) => r.country).filter(Boolean))].sort()
   const suppliers = [...new Set(rows.map((r) => r.supplier_name).filter(Boolean))].sort()
@@ -133,7 +134,11 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
       (!country || (r.country || '').toLowerCase().includes(country.toLowerCase())) &&
       (!supplier || (r.supplier_name || '').toLowerCase().includes(supplier.toLowerCase())) &&
       (!incoterm || r.incoterm === incoterm))
-    .map((r) => ({ ...r, _cost: costPerUnitILS(r, rates), _sale: salePriceILS(r, rates) })),
+    .map((r) => {
+      const otherCostILS = toILS(r.freight_unit_cost, r.freight_currency || 'ILS', rates) + toILS(r.extra_unit_cost, r.extra_currency || 'ILS', rates)
+      const missingCosts = !Number(r.freight_unit_cost) || !Number(r.extra_unit_cost)
+      return { ...r, _cost: costPerUnitILS(r, rates), _sale: salePriceILS(r, rates), _other: otherCostILS, _missing: missingCosts }
+    }),
   [rows, country, supplier, incoterm, rates])
 
   const sorted = useMemo(() => {
@@ -197,6 +202,12 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
           {Object.keys(INCOTERMS).map((k) => <option key={k} value={k}>{k}</option>)}
         </select>
       </div>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+        <label style={{ margin: 0, whiteSpace: 'nowrap' }}>הצג מחירים ב-</label>
+        <select style={{ maxWidth: 110 }} value={disp} onChange={(e) => setDisp(e.target.value)}>
+          {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+        </select>
+      </div>
       {sorted.length === 0 && <div className="empty">אין מחירים תואמים לסינון</div>}
       {sorted.length > 0 && (
         <div style={{ overflowX: 'auto' }}>
@@ -208,9 +219,10 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
                 {th('country', 'מדינה')}
                 {th('incoterm', 'תנאי')}
                 {th('unit_cost', 'מחיר ספק')}
-                {th('_cost', 'עלות ₪')}
+                {th('_other', 'עלויות נוספות')}
+                {th('_cost', 'סה״כ עלות')}
                 {th('margin_pct', '% רווח')}
-                {th('_sale', 'מכירה ₪')}
+                {th('_sale', 'מכירה')}
                 <th></th>
               </tr>
             </thead>
@@ -222,9 +234,13 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
                   <td>{r.country || '—'}</td>
                   <td>{r.incoterm}</td>
                   <td className="num" dir="ltr">{fmtCur(Number(r.unit_cost), r.currency)}</td>
-                  <td className="num">{fmtMoney(r._cost)}</td>
+                  <td className="num" dir="ltr">
+                    {fmtCur(fromILS(r._other, disp, rates), disp)}
+                    {r._missing && <span title="הובלה ו/או עלויות נוספות לא הוזנו" style={{ marginInlineStart: 4 }}>⚠️</span>}
+                  </td>
+                  <td className="num" dir="ltr">{fmtCur(fromILS(r._cost, disp, rates), disp)}</td>
                   <td className="num">{Number(r.margin_pct)}%</td>
-                  <td className="num" style={{ color: 'var(--good-text)', fontWeight: 700 }}>{fmtMoney(r._sale)}</td>
+                  <td className="num" dir="ltr" style={{ color: 'var(--good-text)', fontWeight: 700 }}>{fmtCur(fromILS(r._sale, disp, rates), disp)}</td>
                   <td><button className="ghost small" onClick={() => onEdit(r)}>✎</button></td>
                 </tr>
               ))}
@@ -233,7 +249,7 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
         </div>
       )}
       <div className="small-text muted" style={{ marginTop: 8 }}>
-        לחיצה על כותרת עמודה ממיינת · העלות והמכירה בשקלים לפי שער עדכני · {sorted.length} שורות
+        לחיצה על כותרת עמודה ממיינת · העלות והמכירה מוצגות ב-{disp} לפי שער עדכני · ⚠️ = הובלה ו/או עלויות נוספות לא הוזנו · {sorted.length} שורות
       </div>
     </>
   )
@@ -246,7 +262,6 @@ function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
     extra_unit_cost: 0, extra_currency: 'ILS', margin_pct: 30,
     quote_date: new Date().toISOString().slice(0, 10), notes: '',
   })
-  const [displayCurr, setDisplayCurr] = useState('auto')
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
@@ -262,8 +277,7 @@ function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
     extra_unit_cost: Number(f.extra_unit_cost) || 0, extra_currency: f.extra_currency,
     margin_pct: Number(f.margin_pct) || 0,
   }
-  const autoDisp = displayCurrency(preview)
-  const disp = displayCurr === 'auto' ? autoDisp : displayCurr
+  const disp = displayCurrency(preview)
   const costI = costPerUnitILS(preview, rates)
   const saleI = salePriceILS(preview, rates)
 
@@ -342,23 +356,12 @@ function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
         <label>הערות</label>
         <input value={f.notes || ''} onChange={set('notes')} />
 
-        <label style={{ marginTop: 14 }}>הצג עלויות ומחיר מכירה ב-</label>
-        <select value={displayCurr} onChange={(e) => setDisplayCurr(e.target.value)}>
-          <option value="auto">אוטומטי (לפי המטבע בו מחושב)</option>
-          {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-        </select>
-
         <div className="card" style={{ marginTop: 14, background: 'var(--page)' }}>
           <div className="num">עלות כוללת ליחידה: <b>{fmtCur(fromILS(costI, disp, rates), disp)}</b>{disp !== 'ILS' && <span className="muted"> ({fmtMoney(costI)})</span>}</div>
           <div className="num" style={{ fontSize: '1.15rem', color: 'var(--good-text)' }}>
             מחיר מכירה מומלץ: <b>{fmtCur(fromILS(saleI, disp, rates), disp)}</b>{disp !== 'ILS' && <span className="muted"> ({fmtMoney(saleI)})</span>}
           </div>
           <div className="small-text muted">מחושב לפי שער עדכני — המחיר יתעדכן אוטומטית עם השער</div>
-          {(Number(f.freight_unit_cost) === 0 || Number(f.extra_unit_cost) === 0) && (
-            <div className="small-text" style={{ marginTop: 8, color: '#ff9500' }}>
-              ⚠️ {!Number(f.freight_unit_cost) && !Number(f.extra_unit_cost) ? 'עלויות הובלה ועלויות נוספות לא הוזנו' : !Number(f.freight_unit_cost) ? 'עלויות הובלה לא הוזנו' : 'עלויות נוספות לא הוזנו'}
-            </div>
-          )}
         </div>
 
         {err && <div className="error">{err}</div>}
