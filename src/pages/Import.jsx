@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase, fmtMoney, fmtDate, IMPORT_KIND_LABELS } from '../supabase.js'
 import { SHIPMENT_STATUS, landedCosts, stockByProduct, weeklyDemandByProduct, downloadCsv } from '../logic.js'
 import Modal from '../components/Modal.jsx'
@@ -439,7 +440,7 @@ export function SuppliersTab() {
       {suppliers.map((s) => (
         <div key={s.id} className="list-item">
           <div className="grow">
-            <div className="title">{s.name} {s.country ? `· ${s.country}` : ''}</div>
+            <div className="title"><Link to={`/suppliers/${s.id}`}>{s.name}</Link> {s.country ? `· ${s.country}` : ''}</div>
             <div className="sub">
               {[s.contact_name, s.phone, s.currency, s.payment_terms].filter(Boolean).join(' · ')}
             </div>
@@ -454,7 +455,7 @@ export function SuppliersTab() {
   )
 }
 
-function SupplierForm({ initial, onClose, onSaved }) {
+export function SupplierForm({ initial, onClose, onSaved }) {
   const [f, setF] = useState(initial || { name: '', country: '', contact_name: '', phone: '', email: '', currency: 'USD', payment_terms: '', notes: '' })
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })

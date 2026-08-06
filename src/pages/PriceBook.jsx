@@ -256,13 +256,16 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
   )
 }
 
-export function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
+// `initial` (an existing supplier_quotes row, must include id) puts the form in edit mode.
+// `prefill` seeds a few fields on a brand-new row (e.g. supplier/country from a supplier card) without editing anything.
+export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onSaved }) {
   const [f, setF] = useState(initial || {
     product_name: '', supplier_id: '', supplier_name: '', country: '', incoterm: 'FOB',
     unit: 'kg', unit_cost: '', currency: 'USD', freight_unit_cost: 0, freight_currency: 'ILS',
     extra_unit_cost: 0, extra_currency: 'ILS', margin_pct: 30,
     packaging_type: '', package_weight_kg: '',
     quote_date: new Date().toISOString().slice(0, 10), notes: '',
+    ...prefill,
   })
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })

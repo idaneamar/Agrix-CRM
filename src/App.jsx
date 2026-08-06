@@ -11,6 +11,7 @@ import Finance from './pages/Finance.jsx'
 import PriceBook from './pages/PriceBook.jsx'
 import ProductDetail from './pages/ProductDetail.jsx'
 import Suppliers from './pages/Suppliers.jsx'
+import SupplierDetail from './pages/SupplierDetail.jsx'
 import Settings from './pages/Settings.jsx'
 
 const NAV = [
@@ -70,6 +71,7 @@ export default function App() {
               <Route path="/orders" element={<Orders />} />
               <Route path="/import" element={<ImportPage />} />
               <Route path="/suppliers" element={<Suppliers />} />
+              <Route path="/suppliers/:id" element={<SupplierDetail />} />
               <Route path="/finance" element={<Finance />} />
               <Route path="/prices" element={<PriceBook />} />
               <Route path="/prices/:id" element={<ProductDetail />} />
