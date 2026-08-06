@@ -566,6 +566,7 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
   )
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [openSuggestions, setOpenSuggestions] = useState(-1)
 
   function defaultValidity() {
     const d = new Date(); d.setDate(d.getDate() + 14)
@@ -586,7 +587,7 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
     if (r.country) searchParts.push(r.country)
     return {
       searchLabel: searchParts.join(' · '),
-      description: `${name}${r.country ? ` (${r.country})` : ''}`,
+      description: `${name}${r.product_code ? ` (${r.product_code})` : ''}`,
       unit: r.unit,
       price: Math.round(salePriceILS(r, rates) * 100) / 100,
     }
@@ -607,8 +608,7 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
     const n = items.slice(); n[i] = { ...n[i], [k]: v }; setItems(n)
   }
 
-  // Picking a suggestion (exact match on its searchLabel, which includes the
-  // product code + supplier for disambiguation) swaps in the clean description
+  // Picking a suggestion (exact match on its searchLabel) swaps in the clean description
   // and auto-fills unit/price. Anything else (free typing, no match) is kept as-is.
   function updDescription(i, v) {
     const sug = suggestions.find((s) => s.searchLabel === v)
@@ -617,6 +617,14 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
       ? { ...n[i], description: sug.description, unit: sug.unit || n[i].unit, unit_price: sug.price !== '' && sug.price != null ? sug.price : n[i].unit_price }
       : { ...n[i], description: v }
     setItems(n)
+    setOpenSuggestions(-1)
+  }
+
+  // Filter suggestions based on search term (searches in searchLabel for flexibility)
+  function getSuggestionsForInput(val) {
+    if (!val.trim()) return suggestions.slice(0, 20) // show first 20 if empty
+    const q = val.toLowerCase()
+    return suggestions.filter((s) => s.searchLabel.toLowerCase().includes(q))
   }
 
   const subtotal = items.reduce((t, it) => t + effQty(it) * (Number(it.unit_price) || 0), 0)
@@ -678,23 +686,51 @@ export function QuoteForm({ initial, customers, priceBook, products, cps, rates,
           <h3>פריטים</h3>
           <button type="button" className="ghost small" onClick={addItem}>+ שורה ריקה</button>
         </div>
-        <datalist id="quote-item-suggestions">
-          {suggestions.map((s, i) => <option key={i} value={s.searchLabel} />)}
-        </datalist>
         {items.map((it, i) => {
           const cartonMode = Number(it.kg_per_carton) > 0 && Number(it.cartons) > 0
           const qty = effQty(it)
           const lineTotal = qty * (Number(it.unit_price) || 0)
+          const filteredSugs = getSuggestionsForInput(it.description)
+          const showSuggestions = openSuggestions === i && filteredSugs.length > 0
           return (
-            <div key={i} className="card" style={{ background: 'var(--page)', padding: '10px 12px', marginBottom: 8 }}>
-              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6 }}>
-                <input
-                  style={{ flex: 1 }}
-                  list="quote-item-suggestions"
-                  placeholder="הקלד לחיפוש מוצר, קוד או ספק — או הזן חופשי…"
-                  value={it.description}
-                  onChange={(e) => updDescription(i, e.target.value)}
-                />
+            <div key={i} className="card" style={{ background: 'var(--page)', padding: '10px 12px', marginBottom: 8, position: 'relative' }}>
+              <div style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 6, position: 'relative' }}>
+                <div style={{ flex: 1, position: 'relative' }}>
+                  <input
+                    style={{ width: '100%' }}
+                    placeholder="הקלד לחיפוש מוצר, קוד או ספק — או הזן חופשי…"
+                    value={it.description}
+                    onChange={(e) => updDescription(i, e.target.value)}
+                    onFocus={() => setOpenSuggestions(i)}
+                    onBlur={() => setTimeout(() => setOpenSuggestions(-1), 200)}
+                  />
+                  {showSuggestions && (
+                    <div style={{
+                      position: 'absolute', top: '100%', insetInlineStart: 0, right: 0, left: 0,
+                      background: '#fff', border: '1px solid #ccc', borderRadius: '4px',
+                      maxHeight: '200px', overflowY: 'auto', zIndex: 1000,
+                      marginTop: '2px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                    }}>
+                      {filteredSugs.map((sug, j) => (
+                        <div
+                          key={j}
+                          onClick={() => updDescription(i, sug.searchLabel)}
+                          style={{
+                            padding: '10px 12px', borderBottom: '1px solid #f0f0f0',
+                            cursor: 'pointer', fontSize: '0.9rem', lineHeight: 1.4,
+                          }}
+                          onMouseEnter={(e) => e.currentTarget.style.background = '#f5f5f5'}
+                          onMouseLeave={(e) => e.currentTarget.style.background = '#fff'}
+                        >
+                          <div style={{ fontWeight: 500 }}>{sug.searchLabel}</div>
+                          <div style={{ fontSize: '0.85rem', color: '#666' }}>
+                            מחיר: {fmtMoney(sug.price)} · {sug.unit}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 <button type="button" className="ghost small" onClick={() => setItems(items.filter((_, j) => j !== i))}>✕</button>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
