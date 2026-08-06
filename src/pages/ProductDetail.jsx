@@ -7,6 +7,7 @@ import {
   INCOTERMS, QuoteCalcForm, MoneyRow,
   costPerUnitILS, salePriceILS,
 } from './PriceBook.jsx'
+import Attachments from '../components/Attachments.jsx'
 
 const UNIT_LABEL = { kg: 'ק״ג', unit: 'יחידה', carton: 'קרטון' }
 
@@ -157,6 +158,11 @@ export default function ProductDetail() {
             </div>
           )}
         </div>
+      </div>
+
+      <div className="card">
+        <h2>מסמכים ותמונות</h2>
+        <Attachments filterKey="supplier_quote_id" filterId={row.id} pathPrefix="products" />
       </div>
 
       {editing && (

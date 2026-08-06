@@ -3,9 +3,10 @@ import { useParams, useNavigate, Link } from 'react-router-dom'
 import { supabase, fmtMoney, fmtDate } from '../supabase.js'
 import Modal from '../components/Modal.jsx'
 import { useRates } from '../rates.js'
-import { SHIPMENT_STATUS } from '../logic.js'
+import { SHIPMENT_STATUS, googleMapsLink } from '../logic.js'
 import { SupplierForm } from './Import.jsx'
 import { INCOTERMS, QuoteCalcForm, costPerUnitILS, salePriceILS } from './PriceBook.jsx'
+import Attachments from '../components/Attachments.jsx'
 
 export default function SupplierDetail() {
   const { id } = useParams()
@@ -39,6 +40,7 @@ export default function SupplierDetail() {
   }
 
   const wa = supplier.phone ? `https://wa.me/${supplier.phone.replace(/\D/g, '')}` : null
+  const mapLink = googleMapsLink(supplier.location)
 
   return (
     <div>
@@ -59,6 +61,7 @@ export default function SupplierDetail() {
           {supplier.phone && <a className="btn small" href={`tel:${supplier.phone}`}>📞 חיוג</a>}
           {wa && <a className="btn small" style={{ background: '#25d366' }} href={wa} target="_blank" rel="noreferrer">💬 וואטסאפ</a>}
           {supplier.email && <a className="btn small" href={`mailto:${supplier.email}`}>✉️ מייל</a>}
+          {mapLink && <a className="btn small" style={{ background: '#4285F4' }} href={mapLink} target="_blank" rel="noreferrer">🗺 מפה</a>}
         </div>
         <table>
           <tbody>
@@ -68,6 +71,7 @@ export default function SupplierDetail() {
             <tr><th>מדינה</th><td>{supplier.country || '—'}</td></tr>
             <tr><th>מטבע</th><td>{supplier.currency}</td></tr>
             <tr><th>תנאי תשלום</th><td>{supplier.payment_terms || '—'}</td></tr>
+            <tr><th>מיקום</th><td>{supplier.location || <span className="muted">לא הוזן</span>}</td></tr>
           </tbody>
         </table>
         {supplier.notes && (
@@ -115,6 +119,11 @@ export default function SupplierDetail() {
             </table>
           </div>
         )}
+      </div>
+
+      <div className="card">
+        <h2>מסמכים ותמונות</h2>
+        <Attachments filterKey="supplier_id" filterId={supplier.id} pathPrefix="suppliers" />
       </div>
 
       <div className="card">

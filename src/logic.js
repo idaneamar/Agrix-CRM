@@ -114,3 +114,13 @@ export function wazeLink(customer) {
   if (!addr) return null
   return `https://waze.com/ul?q=${encodeURIComponent(addr)}&navigate=yes`
 }
+
+// Accepts either a free-text address/location or an already-pasted Google Maps
+// link (e.g. shared from the Maps app) and returns a clickable Maps URL.
+export function googleMapsLink(location) {
+  if (!location) return null
+  const trimmed = location.trim()
+  if (!trimmed) return null
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(trimmed)}`
+}

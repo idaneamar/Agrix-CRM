@@ -456,7 +456,7 @@ export function SuppliersTab() {
 }
 
 export function SupplierForm({ initial, onClose, onSaved }) {
-  const [f, setF] = useState(initial || { name: '', country: '', contact_name: '', phone: '', email: '', currency: 'USD', payment_terms: '', notes: '' })
+  const [f, setF] = useState(initial || { name: '', country: '', contact_name: '', phone: '', email: '', currency: 'USD', payment_terms: '', location: '', notes: '' })
   const [err, setErr] = useState('')
   const set = (k) => (e) => setF({ ...f, [k]: e.target.value })
 
@@ -493,6 +493,8 @@ export function SupplierForm({ initial, onClose, onSaved }) {
         <input dir="ltr" type="email" value={f.email || ''} onChange={set('email')} />
         <label>תנאי תשלום (מקדמה 30%, LC, שוטף…)</label>
         <input value={f.payment_terms || ''} onChange={set('payment_terms')} />
+        <label>מיקום (כתובת או קישור מ-Google Maps)</label>
+        <input value={f.location || ''} onChange={set('location')} placeholder="למשל: כתובת מלאה, או קישור ששיתפת מ-Google Maps" />
         <label>הערות</label>
         <textarea value={f.notes || ''} onChange={set('notes')} />
         {err && <div className="error">{err}</div>}
