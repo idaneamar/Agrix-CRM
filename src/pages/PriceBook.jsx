@@ -1,11 +1,12 @@
 import React, { useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { supabase, fmtMoney, fmtDate } from '../supabase.js'
 import { downloadCsv } from '../logic.js'
 import { LOGO } from '../logo.js'
 import { CURRENCIES, useRates, toILS, fromILS, fmtCur } from '../rates.js'
 import Modal from '../components/Modal.jsx'
 
-const INCOTERMS = { EXW: 'EXW (מחצר הספק)', FOB: 'FOB (עד הנמל בחו"ל)', CIF: 'CIF (כולל הובלה וביטוח)', DDP: 'DDP (עד הדלת)', other: 'אחר' }
+export const INCOTERMS = { EXW: 'EXW (מחצר הספק)', FOB: 'FOB (עד הנמל בחו"ל)', CIF: 'CIF (כולל הובלה וביטוח)', DDP: 'DDP (עד הדלת)', other: 'אחר' }
 export const QUOTE_STATUS = { draft: 'טיוטה', sent: 'נשלחה', accepted: 'התקבלה', rejected: 'נדחתה' }
 
 // Effective quantity of a quote item: cartons × kg-per-carton when both set, otherwise manual quantity.
@@ -32,7 +33,7 @@ export function displayCurrency(q) {
 }
 
 // Amount input with a currency selector beside it.
-function MoneyRow({ label, value, onValue, currency, onCurrency, required }) {
+export function MoneyRow({ label, value, onValue, currency, onCurrency, required }) {
   return (
     <div>
       <label>{label}</label>
@@ -229,7 +230,7 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
             <tbody>
               {sorted.map((r) => (
                 <tr key={r.id}>
-                  <td><b>{r.product_name}</b></td>
+                  <td><Link to={`/prices/${r.id}`} style={{ fontWeight: 700 }}>{r.product_name}</Link></td>
                   <td>{r.supplier_name || <span className="muted">—</span>}</td>
                   <td>{r.country || '—'}</td>
                   <td>{r.incoterm}</td>
@@ -255,11 +256,12 @@ function PriceTable({ rows, rates, q, setQ, onEdit }) {
   )
 }
 
-function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
+export function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
   const [f, setF] = useState(initial || {
     product_name: '', supplier_id: '', supplier_name: '', country: '', incoterm: 'FOB',
     unit: 'kg', unit_cost: '', currency: 'USD', freight_unit_cost: 0, freight_currency: 'ILS',
     extra_unit_cost: 0, extra_currency: 'ILS', margin_pct: 30,
+    packaging_type: '', package_weight_kg: '',
     quote_date: new Date().toISOString().slice(0, 10), notes: '',
   })
   const [err, setErr] = useState('')
@@ -300,13 +302,36 @@ function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
       extra_unit_cost: Number(f.extra_unit_cost) || 0,
       extra_currency: f.extra_currency || 'ILS',
       margin_pct: Number(f.margin_pct) || 0,
+      packaging_type: f.packaging_type || null,
+      package_weight_kg: f.package_weight_kg === '' ? null : Number(f.package_weight_kg),
       quote_date: f.quote_date,
       notes: f.notes || null,
     }
+    // Did any price-relevant field actually change? If so (or this is a brand-new
+    // row), log a snapshot to price_history so the product card shows a full timeline.
+    const priceChanged = !initial ||
+      Number(initial.unit_cost) !== row.unit_cost || initial.currency !== row.currency ||
+      Number(initial.freight_unit_cost || 0) !== row.freight_unit_cost || (initial.freight_currency || 'ILS') !== row.freight_currency ||
+      Number(initial.extra_unit_cost || 0) !== row.extra_unit_cost || (initial.extra_currency || 'ILS') !== row.extra_currency ||
+      Number(initial.margin_pct) !== row.margin_pct
+
+    let quoteId = initial?.id
     const res = initial
       ? await supabase.from('supplier_quotes').update(row).eq('id', initial.id)
-      : await supabase.from('supplier_quotes').insert(row)
+      : await supabase.from('supplier_quotes').insert(row).select().single()
     if (res.error) return setErr(res.error.message)
+    if (!initial) quoteId = res.data.id
+
+    if (priceChanged) {
+      await supabase.from('price_history').insert({
+        supplier_quote_id: quoteId,
+        unit_cost: row.unit_cost, currency: row.currency, fx_rate: row.fx_rate,
+        freight_unit_cost: row.freight_unit_cost, freight_currency: row.freight_currency,
+        extra_unit_cost: row.extra_unit_cost, extra_currency: row.extra_currency,
+        margin_pct: row.margin_pct, effective_date: row.quote_date,
+        note: initial ? 'עדכון מחיר' : 'מחיר ראשוני',
+      })
+    }
     onSaved()
   }
 
@@ -353,8 +378,12 @@ function QuoteCalcForm({ initial, suppliers, rates, onClose, onSaved }) {
         <MoneyRow label="עלויות נוספות ליחידה" value={f.extra_unit_cost} onValue={set('extra_unit_cost')} currency={f.extra_currency} onCurrency={set('extra_currency')} />
         <label>אחוז רווח רצוי (%)</label>
         <input type="number" step="0.1" min="0" value={f.margin_pct} onChange={set('margin_pct')} />
+        <div className="formrow">
+          <div><label>דרך אריזה</label><input value={f.packaging_type || ''} onChange={set('packaging_type')} placeholder="קרטון, שק, פאלט…" /></div>
+          <div><label>משקל באריזה (ק״ג)</label><input type="number" step="0.01" min="0" value={f.package_weight_kg ?? ''} onChange={set('package_weight_kg')} placeholder="למשל 20" /></div>
+        </div>
         <label>הערות</label>
-        <input value={f.notes || ''} onChange={set('notes')} />
+        <textarea rows={4} value={f.notes || ''} onChange={set('notes')} placeholder="כל מידע נוסף על המוצר, הספק, תנאים מיוחדים…" />
 
         <div className="card" style={{ marginTop: 14, background: 'var(--page)' }}>
           <div className="num">עלות כוללת ליחידה: <b>{fmtCur(fromILS(costI, disp, rates), disp)}</b>{disp !== 'ILS' && <span className="muted"> ({fmtMoney(costI)})</span>}</div>

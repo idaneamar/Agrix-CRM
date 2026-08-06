@@ -9,6 +9,7 @@ import Orders from './pages/Orders.jsx'
 import ImportPage from './pages/Import.jsx'
 import Finance from './pages/Finance.jsx'
 import PriceBook from './pages/PriceBook.jsx'
+import ProductDetail from './pages/ProductDetail.jsx'
 import Suppliers from './pages/Suppliers.jsx'
 import Settings from './pages/Settings.jsx'
 
@@ -71,6 +72,7 @@ export default function App() {
               <Route path="/suppliers" element={<Suppliers />} />
               <Route path="/finance" element={<Finance />} />
               <Route path="/prices" element={<PriceBook />} />
+              <Route path="/prices/:id" element={<ProductDetail />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
