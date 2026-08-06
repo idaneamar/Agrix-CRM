@@ -32,7 +32,7 @@ export default function CustomerDetail() {
         <div>
           <h1>{customer.name}</h1>
           <div className="muted small-text">
-            {STATUS_LABELS[customer.status]} · אספקה {FREQ_LABELS[customer.delivery_frequency]}
+            {customer.customer_code ? `#${customer.customer_code} · ` : ''}{STATUS_LABELS[customer.status]} · אספקה {FREQ_LABELS[customer.delivery_frequency]}
           </div>
         </div>
         <button className="ghost small" onClick={() => setEditing(true)}>עריכה</button>
@@ -67,6 +67,7 @@ function InfoTab({ c, onDeleted }) {
     onDeleted()
   }
   const rows = [
+    ['מספר לקוח', c.customer_code],
     ['איש קשר', c.contact_name],
     ['טלפון', c.phone && <a href={`tel:${c.phone}`} dir="ltr">{c.phone}</a>],
     ['אימייל', c.email],

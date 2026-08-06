@@ -440,7 +440,10 @@ export function SuppliersTab() {
       {suppliers.map((s) => (
         <div key={s.id} className="list-item">
           <div className="grow">
-            <div className="title"><Link to={`/suppliers/${s.id}`}>{s.name}</Link> {s.country ? `· ${s.country}` : ''}</div>
+            <div className="title">
+              <Link to={`/suppliers/${s.id}`}>{s.name}</Link> {s.country ? `· ${s.country}` : ''}
+              {s.supplier_code && <span className="muted small-text"> · #{s.supplier_code}</span>}
+            </div>
             <div className="sub">
               {[s.contact_name, s.phone, s.currency, s.payment_terms].filter(Boolean).join(' · ')}
             </div>
@@ -464,6 +467,12 @@ export function SupplierForm({ initial, onClose, onSaved }) {
     e.preventDefault(); setErr('')
     const row = { ...f }
     delete row.id; delete row.created_at
+    // Leave supplier_code out of a brand-new insert when left blank, so the DB's
+    // auto-numbering (supplier_code_seq) assigns it. Editing sends whatever is typed.
+    if (!row.supplier_code) {
+      if (initial) row.supplier_code = null
+      else delete row.supplier_code
+    }
     const res = initial
       ? await supabase.from('suppliers').update(row).eq('id', initial.id)
       : await supabase.from('suppliers').insert(row)
@@ -474,8 +483,13 @@ export function SupplierForm({ initial, onClose, onSaved }) {
   return (
     <Modal title={initial ? 'עריכת ספק' : 'ספק חדש'} onClose={onClose}>
       <form onSubmit={save}>
-        <label>שם הספק *</label>
-        <input value={f.name} onChange={set('name')} required />
+        <div className="formrow">
+          <div><label>שם הספק *</label><input value={f.name} onChange={set('name')} required /></div>
+          <div>
+            <label>מספר ספק</label>
+            <input value={f.supplier_code || ''} onChange={set('supplier_code')} placeholder={initial ? '' : 'ריק = יוקצה מספר אוטומטי'} />
+          </div>
+        </div>
         <div className="formrow">
           <div><label>מדינה</label><input value={f.country || ''} onChange={set('country')} /></div>
           <div>

@@ -47,7 +47,9 @@ export default function SupplierDetail() {
       <div className="section-head">
         <div>
           <h1>{supplier.name}</h1>
-          <div className="muted small-text">{supplier.country || '—'} · {supplier.currency}</div>
+          <div className="muted small-text">
+            {supplier.supplier_code ? `#${supplier.supplier_code} · ` : ''}{supplier.country || '—'} · {supplier.currency}
+          </div>
         </div>
         <div className="actions" style={{ margin: 0 }}>
           <button className="ghost small" onClick={() => nav('/suppliers')}>← חזרה לספקים</button>
@@ -65,7 +67,8 @@ export default function SupplierDetail() {
         </div>
         <table>
           <tbody>
-            <tr><th style={{ width: 160 }}>איש קשר</th><td>{supplier.contact_name || '—'}</td></tr>
+            <tr><th style={{ width: 160 }}>מספר ספק</th><td>{supplier.supplier_code || '—'}</td></tr>
+            <tr><th>איש קשר</th><td>{supplier.contact_name || '—'}</td></tr>
             <tr><th>טלפון</th><td dir="ltr">{supplier.phone || '—'}</td></tr>
             <tr><th>אימייל</th><td dir="ltr">{supplier.email || '—'}</td></tr>
             <tr><th>מדינה</th><td>{supplier.country || '—'}</td></tr>

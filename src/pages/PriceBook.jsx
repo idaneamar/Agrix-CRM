@@ -300,7 +300,6 @@ export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onS
     const row = {
       product_name: f.product_name,
       variant_name: f.variant_name || null,
-      product_code: f.product_code || null,
       supplier_id: f.supplier_id || null,
       supplier_name: f.supplier_name || null,
       country: f.country || null,
@@ -319,6 +318,11 @@ export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onS
       quote_date: f.quote_date,
       notes: f.notes || null,
     }
+    // Product code: on a brand-new row with no code typed in, leave the key out of
+    // the insert entirely so the DB's auto-numbering (product_code_seq) fills it in.
+    // Editing an existing row always sends whatever is in the field (including blank).
+    if (initial || f.product_code) row.product_code = f.product_code || null
+
     // Did any price-relevant field actually change? If so (or this is a brand-new
     // row), log a snapshot to price_history so the product card shows a full timeline.
     const priceChanged = !initial ||
@@ -359,8 +363,12 @@ export function QuoteCalcForm({ initial, prefill, suppliers, rates, onClose, onS
           <div><label>שם המוצר (אב) *</label><input value={f.product_name} onChange={set('product_name')} required placeholder="למשל: מקדמיה, קפה" /></div>
           <div><label>תת-מוצר / זן</label><input value={f.variant_name || ''} onChange={set('variant_name')} placeholder="למשל: סטייל 0, Arabica" /></div>
         </div>
-        <label>קוד מוצר (SKU)</label>
-        <input value={f.product_code || ''} onChange={set('product_code')} placeholder="קוד פנימי לזיהוי המוצר, למשל: MC-001" />
+        <label>קוד מוצר</label>
+        <input
+          value={f.product_code || ''}
+          onChange={set('product_code')}
+          placeholder={initial ? '' : 'ריק = יוקצה מספר אוטומטי'}
+        />
         <div className="formrow">
           <div>
             <label>ספק קיים</label>

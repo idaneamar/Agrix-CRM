@@ -20,6 +20,12 @@ export function CustomerForm({ initial, onSaved, onClose }) {
     setBusy(true); setErr('')
     const row = { ...f }
     delete row.id; delete row.created_at; delete row.updated_at
+    // Leave customer_code out of a brand-new insert when left blank, so the DB's
+    // auto-numbering (customer_code_seq) assigns it. Editing sends whatever is typed.
+    if (!row.customer_code) {
+      if (initial?.id) row.customer_code = null
+      else delete row.customer_code
+    }
     let res
     if (initial?.id) res = await supabase.from('customers').update(row).eq('id', initial.id).select().single()
     else res = await supabase.from('customers').insert(row).select().single()
@@ -30,8 +36,13 @@ export function CustomerForm({ initial, onSaved, onClose }) {
 
   return (
     <form onSubmit={save}>
-      <label>שם העסק *</label>
-      <input value={f.name} onChange={set('name')} required />
+      <div className="formrow">
+        <div><label>שם העסק *</label><input value={f.name} onChange={set('name')} required /></div>
+        <div>
+          <label>מספר לקוח</label>
+          <input value={f.customer_code || ''} onChange={set('customer_code')} placeholder={initial?.id ? '' : 'ריק = יוקצה מספר אוטומטי'} />
+        </div>
+      </div>
       <div className="formrow">
         <div><label>איש קשר</label><input value={f.contact_name || ''} onChange={set('contact_name')} /></div>
         <div><label>טלפון</label><input dir="ltr" value={f.phone || ''} onChange={set('phone')} /></div>
@@ -101,7 +112,7 @@ export default function Customers() {
         {filtered.map((c) => (
           <Link key={c.id} to={`/customers/${c.id}`} className="list-item">
             <div className="grow">
-              <div className="title">{c.name}</div>
+              <div className="title">{c.name}{c.customer_code && <span className="muted small-text"> · #{c.customer_code}</span>}</div>
               <div className="sub">
                 {[c.contact_name, c.phone, c.city].filter(Boolean).join(' · ') || '—'}
               </div>
